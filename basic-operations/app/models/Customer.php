@@ -61,75 +61,82 @@ class Customer extends Database{
     }
 
     public function getAccountsByCustomerId($customer_id) {
-        $this->db->query("
-                SELECT
-                a.account_id,
-                a.account_number,
-                act.type_name AS account_type,
-                c.first_name,
-                c.last_name,
-                COALESCE(SUM(CASE WHEN tt.type_name = 'Deposit' THEN t.amount ELSE 0 END), 0) AS total_deposit,
-                COALESCE(SUM(CASE WHEN tt.type_name = 'Withdrawal' THEN t.amount ELSE 0 END), 0) AS total_withdrawal,
-                COALESCE(SUM(CASE WHEN tt.type_name = 'Service Charge' THEN t.amount ELSE 0 END), 0) AS total_service_charge
-            FROM customer_linked_accounts cla
-            INNER JOIN accounts a ON cla.account_id = a.account_id
-            INNER JOIN customers c ON cla.customer_id = c.customer_id
-            LEFT JOIN account_types act ON a.account_type_id = act.account_type_id
-            LEFT JOIN transactions t ON a.account_id = t.account_id
-            LEFT JOIN transaction_types tt ON t.transaction_type_id = tt.transaction_type_id
-            WHERE cla.customer_id = :customer_id AND cla.is_active = 1 AND a.is_locked = 0
-            GROUP BY a.account_id, c.customer_id, a.account_number, act.type_name, c.first_name, c.last_name
-            ORDER BY a.created_at DESC
-        ");
+    // --- 1. FIRST QUERY (GET ACCOUNTS AND BALANCES) ---
+    $this->db->query("
+        SELECT
+            a.account_id,
+            a.account_number,
+            act.type_name AS account_type,
+            c.first_name,
+            c.last_name,
+            
+            COALESCE(SUM(
+                CASE tt.type_name
+                    WHEN 'Deposit' THEN t.amount
+                    WHEN 'Transfer In' THEN t.amount
+                    WHEN 'Interest Payment' THEN t.amount
+                    WHEN 'Withdrawal' THEN -t.amount
+                    WHEN 'Transfer Out' THEN -t.amount
+                    WHEN 'Fee' THEN -t.amount
+                    WHEN 'Loan Payment' THEN -t.amount
+                    ELSE 0
+                END
+            ), 0) AS current_balance
+            
+        FROM 
+            customer_linked_accounts cla
+        INNER JOIN accounts a ON cla.account_id = a.account_id
+        INNER JOIN customers c ON cla.customer_id = c.customer_id
+        LEFT JOIN account_types act ON a.account_type_id = act.account_type_id
+        LEFT JOIN transactions t ON a.account_id = t.account_id
+        LEFT JOIN transaction_types tt ON t.transaction_type_id = tt.transaction_type_id
+        WHERE 
+            cla.customer_id = :customer_id AND cla.is_active = 1 AND a.is_locked = 0
+        GROUP BY 
+            a.account_id, a.account_number, act.type_name, c.first_name, c.last_name
+        ORDER BY a.created_at DESC;
+    ");
 
-        $this->db->bind(':customer_id', $customer_id);
-        $rawAccounts = $this->db->resultSet();
+    $this->db->bind(':customer_id', $customer_id);
+    $accounts = $this->db->resultSet();
 
-        $accounts = [];
-        foreach ($rawAccounts as $rawAccount) {
-            $beginning_balance = 0.00;
+    foreach ($accounts as $account) {
+        $account->account_name = $account->first_name . ' ' . $account->last_name;
+        $account->branch = 'SM Fairview';
+        
+        // Use the calculated balance from the SQL query
+        $account->beginning_balance = 0.00; // This is arbitrary, 'current_balance' is the useful value
+        $account->ending_balance = (float) $account->current_balance;
 
-            $total_deposit = (float) $rawAccount->total_deposit;
-            $total_withdrawal = (float) $rawAccount->total_withdrawal;
-            $total_service_charge = (float) $rawAccount->total_service_charge;
-
-            $ending_balance = ($beginning_balance + $total_deposit) - ($total_withdrawal + $total_service_charge);
-
-            $account = (array) $rawAccount;
-            $account['account_name'] = $rawAccount->first_name . ' ' . $rawAccount->last_name;
-            $account['branch'] = 'SM Fairview';
-            $account['beginning_balance'] = $beginning_balance;
-            $account['ending_balance'] = $ending_balance;
-
-            if (str_contains(strtolower($account['account_type']), 'credit card')) {
-                $account['available_credit'] = 5245.00;
-                $account['credit_limit'] = 50000.00;
-            } else {
-                $account['available_credit'] = null;
-                $account['credit_limit'] = null;
-            }
-
-            $this->db->query("
-                SELECT
-                    t.transaction_id,
-                    t.amount,
-                    t.description,
-                    tt.type_name AS transaction_type_name,
-                    t.created_at
-                FROM transactions t
-                JOIN transaction_types tt ON t.transaction_type_id = tt.transaction_type_id
-                WHERE t.account_id = :account_id
-                ORDER BY t.created_at DESC
-                LIMIT 3
-            ");
-            $this->db->bind(':account_id', $rawAccount->account_id);
-            $account['transactions'] = $this->db->resultSet();
-
-            $accounts[] = (object) $account;
+        // Credit Card Logic
+        if (str_contains(strtolower($account->account_type), 'credit card')) {
+            $account->available_credit = 5245.00;
+            $account->credit_limit = 50000.00;
+        } else {
+            $account->available_credit = null;
+            $account->credit_limit = null;
         }
 
-        return $accounts;
+        $this->db->query("
+            SELECT
+                t.transaction_id,
+                t.transaction_ref,
+                t.amount,
+                t.description,
+                tt.type_name AS transaction_type_name,
+                t.created_at
+            FROM transactions t
+            JOIN transaction_types tt ON t.transaction_type_id = tt.transaction_type_id
+            WHERE t.account_id = :account_id
+            ORDER BY t.created_at DESC
+            LIMIT 3
+        ");
+        $this->db->bind(':account_id', $account->account_id);
+        $account->transactions = $this->db->resultSet();
     }
+
+    return $accounts;
+}
 
     public function getAccountById($id) {
         $this->db->query('SELECT * FROM accounts WHERE account_id = :id');
@@ -212,5 +219,175 @@ class Customer extends Database{
         }
         return ['success' => false, 'error' => 'Failed to add account.'];
     }
+    
+    public function getAccountByNumber($account_number){
+        $this->db->query("
+            SELECT *
+            FROM accounts
+            WHERE account_number = :account_number;
+        ");
 
+        $this->db->bind(':account_number', $account_number);
+        return $this->db->single();
+    }
+
+    public function validateRecipient($recipient_number, $recipient_name){
+        $this->db->query("
+            SELECT 
+                a.account_number, 
+                CONCAT_WS(c.first_name, ' ', c.last_name) AS customer_name
+            FROM 
+                accounts a
+            INNER JOIN 
+                customers c ON a.customer_id = c.customer_id
+            WHERE 
+                a.account_number = :recipient_number;
+        ");
+        $this->db->bind(':recipient_number', $recipient_number);
+        $result = $this->db->single();
+
+        if(empty($result)){
+            return ['success' => false , 'error' => 'Invalid Account Number'];
+        }
+
+        if (strtolower(trim($result->customer_name)) !== strtolower(trim($recipient_name))) {
+            return ['status' => false, 'error' => 'Recipient name does not match the account number.'];
+        }
+
+        return [
+            'status' => true,
+            'customer_id' => $result->customer_id,
+            'account_number' => $result->account_number
+        ];
+
+    }
+
+    public function validateAmount($account_number){
+        $this->db->query("
+            SELECT 
+                a.account_number,
+                COALESCE(SUM(
+                    CASE tt.type_name 
+                        -- CREDITS (Money In: Positive)
+                        WHEN 'Deposit' THEN t.amount
+                        WHEN 'Transfer In' THEN t.amount         -- <-- ADDED
+                        WHEN 'Interest Payment' THEN t.amount    -- <-- ADDED
+                        
+                        -- DEBITS (Money Out: Negative)
+                        WHEN 'Withdrawal' THEN -t.amount
+                        WHEN 'Transfer Out' THEN -t.amount       -- <-- ADDED
+                        WHEN 'Fee' THEN -t.amount                -- <-- RENAMED (from 'Service Charge')
+                        WHEN 'Loan Payment' THEN -t.amount       -- <-- ADDED
+                        
+                        -- If a transaction type isn't listed (e.g., system error), treat as 0
+                        ELSE 0 
+                    END
+                ), 0) AS balance
+            FROM 
+                accounts a
+            LEFT JOIN 
+                transactions t ON a.account_id = t.account_id
+            LEFT JOIN 
+                transaction_types tt ON t.transaction_type_id = tt.transaction_type_id
+            WHERE 
+                a.account_number = :account_number
+            GROUP BY 
+                a.account_id, a.account_number;
+        ");
+        $this->db->bind('account_number', $account_number);
+
+        return $this->db->single();
+    }
+
+    public function recordTransaction($transaction_ref, $sender, $receiver, $amount, $fee, $message){
+        // for sender
+        $this->db->query("
+        INSERT INTO transactions (
+            transaction_ref,
+            account_id,
+            transaction_type_id,
+            amount,
+            related_account_id,
+            description
+        )
+        VALUES (
+            :transaction_ref,
+            :sender,
+            :transaction_type,
+            :amount,
+            :receiver,
+            :message
+        );
+        ");
+        $this->db->bind(':transaction_ref', $transaction_ref);
+        $this->db->bind(':sender', $sender);
+        $this->db->bind(':transaction_type', 3);
+        $this->db->bind(':amount', $amount);
+        $this->db->bind(':receiver', $receiver);
+        $this->db->bind(':message', $message);
+        $this->db->execute();
+
+        // For the fee
+        $this->db->query("
+        INSERT INTO transactions (
+            account_id,
+            transaction_type_id,
+            amount,
+            description
+        )
+        VALUES (
+            :sender,
+            :transaction_type,
+            :amount,
+            :message
+        );
+        ");
+        $this->db->bind(':sender', $sender);
+        $this->db->bind(':transaction_type', 7);
+        $this->db->bind(':amount', $fee);
+        $this->db->bind(':message', 'Transaction Fee - ' . $transaction_ref);
+        $this->db->execute();
+
+        // for the receiver
+        $this->db->query("
+        INSERT INTO transactions (
+            transaction_ref,
+            account_id,
+            transaction_type_id,
+            amount,
+            related_account_id,
+            description
+        )
+        VALUES (
+            :transaction_ref,
+            :sender,
+            :transaction_type,
+            :amount,
+            :receiver,
+            :message
+        );
+        ");
+        $this->db->bind(':transaction_ref', $transaction_ref);
+        $this->db->bind(':sender', $receiver);
+        $this->db->bind(':transaction_type', 4);
+        $this->db->bind(':amount', $amount);
+        $this->db->bind(':receiver', $sender);
+        $this->db->bind(':message', $message);
+        $this->db->execute();
+    }
+
+    public function getDropDownByCustomerId($customer_id) {
+        $this->db->query("
+            SELECT 
+                a.account_id, 
+                a.account_number
+            FROM 
+                accounts a
+            WHERE 
+                a.customer_id = :id
+        ");
+
+        $this->db->bind(':id', $customer_id);
+        return $this->db->resultSet();
+    }
 }

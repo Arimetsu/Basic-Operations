@@ -1,4 +1,7 @@
-<!-- app/views/layouts/header.php -->
+<?php
+$current_page = basename($_SERVER['PHP_SELF']);
+?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -37,10 +40,10 @@
                 <a class="nav-link <?php echo ($current_page == 'dashboard') ? 'active text-warning' : ''; ?>" href=<?=URLROOT . "/customer/dashboard"?>>Home</a>
             </li>
             <li class="nav-item mx-2">
-                <a class="nav-link <?php echo ($current_page == 'Account') ? 'active text-warning' : ''; ?>" href=<?= URLROOT .'/customer/account'; ?>>Accounts</a>
+                <a class="nav-link <?php echo ($current_page == 'account.php') ? 'active text-warning' : ''; ?>" href=<?= URLROOT .'/customer/account'; ?>>Accounts</a>
             </li>
             <li class="nav-item mx-2">
-                <a class="nav-link <?php echo ($current_page == 'fund_transfer.php') ? 'active text-warning' : ''; ?>" href="fund_transfer.php">Fund Transfer</a>
+                <a class="nav-link <?php echo ($current_page == 'fund_transfer.php') ? 'active text-warning' : ''; ?>" href=<?= URLROOT . "/customer/fund_transfer" ?>>Fund Transfer</a>
             </li>
             <li class="nav-item mx-2">
                 <a class="nav-link <?php echo ($current_page == 'transaction_history.php') ? 'active text-warning' : ''; ?>" href="transaction_history.php">Transaction History</a>

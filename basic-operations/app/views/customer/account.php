@@ -495,21 +495,44 @@
                         <?php if (!empty($firstAccount->transactions)): ?>
                             <?php foreach ($firstAccount->transactions as $transaction): ?>
                                 <?php
-                                $isDeposit = (strtolower($transaction->transaction_type_name) == 'deposit');
-                                $iconClass = $isDeposit ? 'bi-arrow-down-left text-success' : 'bi-arrow-up-right text-warning';
-                                $amountSign = $isDeposit ? '' : '-'; // Deposits usually don't have a sign, withdrawals do
-                                $amountColor = $isDeposit ? 'text-success' : 'text-danger';
+                                // Normalize the transaction type name for reliable checking
+                                $typeName = strtolower($transaction->transaction_type_name);
+                                
+                                // Define CREDIT transactions (Money coming IN)
+                                $isCredit = ($typeName == 'deposit' || $typeName == 'transfer in' || $typeName == 'interest payment');
+                                
+                                // Define DEBIT transactions (Money going OUT)
+                                $isDebit = ($typeName == 'withdrawal' || $typeName == 'transfer out' || $typeName == 'fee' || $typeName == 'loan payment');
+                                
+                                if ($isCredit) {
+                                    $iconClass = 'bi-arrow-down-left text-success';
+                                    $amountSign = ''; 
+                                    $amountColor = 'text-success';
+                                    $descriptionColor = 'text-success';
+                                } elseif ($isDebit) {
+                                    $iconClass = 'bi-arrow-up-right text-danger';
+                                    $amountSign = '-';
+                                    $amountColor = 'text-danger';
+                                    $descriptionColor = 'text-dark';
+                                } else {
+                                    $iconClass = 'bi-exclamation-triangle-fill text-secondary';
+                                    $amountSign = '';
+                                    $amountColor = 'text-secondary';
+                                    $descriptionColor = 'text-secondary';
+                                }
                                 ?>
                                 <div class="list-group-item d-flex justify-content-between align-items-center border rounded mb-4" style="background-color: #D9D9D94D;">
                                     <div>
                                         <div class="row">
-                                            <div class="col-3 mt-2"> <!-- Changed to col-3 for better icon alignment -->
+                                            <div class="col-3 mt-2">
                                                 <i class="bi <?= $iconClass; ?> fs-2"></i>
                                             </div>
-                                            <div class="col-9"> <!-- Changed to col-9 -->
-                                                <strong><?= htmlspecialchars($transaction->description ?? $transaction->transaction_type_name); ?></strong><br>
+                                            <div class="col-8">
+                                                <strong class="<?= $descriptionColor; ?>">
+                                                    <?= htmlspecialchars($transaction->transaction_type_name); ?>
+                                                </strong><br>
                                                 <small class="text-muted">Transaction ID</small><br>
-                                                <small><?= htmlspecialchars($transaction->transaction_id); ?></small>
+                                                <small><?= htmlspecialchars($transaction->transaction_ref); ?></small>
                                             </div>
                                         </div>
                                     </div>
@@ -608,13 +631,38 @@
             const transactions = JSON.parse(card.dataset.transactions || '[]');
             transactionHistoryList.innerHTML = ''; // Clear existing transactions
 
-            if (transactions.length > 0) {
+           if (transactions.length > 0) {
                 transactions.forEach(transaction => {
-                    const isDeposit = transaction.transaction_type_name.toLowerCase() === 'deposit';
-                    const iconClass = isDeposit ? 'bi-arrow-down-left text-success' : 'bi-arrow-up-right text-warning';
-                    const amountSign = isDeposit ? '' : '-';
-                    const amountColor = isDeposit ? 'text-success' : 'text-danger';
+                    
+                    const typeName = transaction.transaction_type_name.toLowerCase();
+                    
+                    // Define Credit (Money In) and Debit (Money Out) transactions
+                    const isCredit = (typeName === 'deposit' || typeName === 'transfer in' || typeName === 'interest payment');
+                    const isDebit = (typeName === 'withdrawal' || typeName === 'transfer out' || typeName === 'fee' || typeName === 'loan payment');
+
+                    let iconClass;
+                    let amountSign;
+                    let amountColor;
+
+                    if (isCredit) {
+                        // Funds coming IN: Green arrow, no sign
+                        iconClass = 'bi-arrow-down-left text-success';
+                        amountSign = '';
+                        amountColor = 'text-success';
+                    } else if (isDebit) {
+                        // Funds going OUT: Red arrow, minus sign
+                        iconClass = 'bi-arrow-up-right text-danger';
+                        amountSign = '-';
+                        amountColor = 'text-danger';
+                    } else {
+                        // Fallback for unknown types
+                        iconClass = 'bi-exclamation-triangle-fill text-secondary';
+                        amountSign = '';
+                        amountColor = 'text-secondary';
+                    }
+
                     const transactionDate = new Date(transaction.created_at);
+                    // Using 'en-US' or another locale that formats dates as desired, ensure PH locale support in your environment
                     const formattedDate = transactionDate.toLocaleDateString('en-PH', { day: '2-digit', month: 'long', year: 'numeric' });
                     const formattedTime = transactionDate.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit', hour12: true });
 
@@ -626,9 +674,9 @@
                                         <i class="bi ${iconClass} fs-2"></i>
                                     </div>
                                     <div class="col-9">
-                                        <strong>${transaction.description || transaction.transaction_type_name}</strong><br>
+                                        <strong>${transaction.transaction_type_name}</strong><br>
                                         <small class="text-muted">Transaction ID</small><br>
-                                        <small>${transaction.transaction_id}</small>
+                                        <small>${transaction.transaction_ref == null ? 'N/A' : transaction.transaction_ref}</small>
                                     </div>
                                 </div>
                             </div>
