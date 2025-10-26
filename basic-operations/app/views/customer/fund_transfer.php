@@ -49,12 +49,12 @@
                         </div>
 
                         <!------- FORM --------------------------------------------------------------------------------------------->
-                        <form action=<?= URLROOT ."/customer/fund_transfer"?> method="POST">
+                        <form action="<?= URLROOT ."/customer/fund_transfer"?>" method="POST">
                             
                             <!-- Sender Number-->
                             <div class="mb-3">
                                 <label class="form-label fw-semibold" style="color: #003631;">From Account:</label>
-                                <select name="from_account" class="form-control" style="background-color: #e8e8df; border: none; border-radius: 8px;" required>
+                                <select name="from_account" class="form-select" style="background-color: #e8e8df; border: none; border-radius: 8px;" required>
                                     <?php foreach($data['accounts'] as $account): ?>
                                         <option value="<?= $account->account_number?>">
                                             <?= $account->account_number ?>
@@ -92,7 +92,7 @@
                             </div>
 
                             <!--- TRANSACTION DETAILS ------------------------------------------------------------------------------>
-                            <div class="mb-3 ms-3 me-2">
+                            <!-- <div class="mb-3 ms-3 me-2">
                                 <div class="d-flex justify-content-between mb-2">
                                     <small class="text-muted">Fee:</small>
                                     <small class="text-muted">+15.00</small>
@@ -105,7 +105,7 @@
                                     <small class="text-muted">Transaction ID:</small>
                                     <small class="text-muted">24DDUX82947SDA2</small>
                                 </div>
-                            </div>
+                            </div> -->
 
                             <!--- CONTINUE BUTTON ---------------------------------------------------------------------------------->
                             <button type="submit" class="btn w-75 mx-auto d-block fw-semibold" style="background-color: #F1B24A; border-radius: 8px; padding: 12px;">

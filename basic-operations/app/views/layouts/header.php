@@ -37,19 +37,19 @@ $current_page = basename($_SERVER['PHP_SELF']);
             <?php if((isset($_SESSION['customer_id']))): ?>
         <ul class="navbar-nav mx-auto">
             <li class="nav-item me-2">
-                <a class="nav-link <?php echo ($current_page == 'dashboard') ? 'active text-warning' : ''; ?>" href=<?=URLROOT . "/customer/dashboard"?>>Home</a>
+                <a class="nav-link <?php echo ($data['title'] == 'Dashboard') ? 'active text-warning' : ''; ?>" href=<?=URLROOT . "/customer/dashboard"?>>Home</a>
             </li>
             <li class="nav-item mx-2">
-                <a class="nav-link <?php echo ($current_page == 'account.php') ? 'active text-warning' : ''; ?>" href=<?= URLROOT .'/customer/account'; ?>>Accounts</a>
+                <a class="nav-link <?php echo ($data['title'] == 'Accounts') ? 'active text-warning' : ''; ?>" href=<?= URLROOT .'/customer/account'; ?>>Accounts</a>
             </li>
             <li class="nav-item mx-2">
-                <a class="nav-link <?php echo ($current_page == 'fund_transfer.php') ? 'active text-warning' : ''; ?>" href=<?= URLROOT . "/customer/fund_transfer" ?>>Fund Transfer</a>
+                <a class="nav-link <?php echo ($data['title'] == 'Fund Transfer') ? 'active text-warning' : ''; ?>" href=<?= URLROOT . "/customer/fund_transfer" ?>>Fund Transfer</a>
             </li>
             <li class="nav-item mx-2">
-                <a class="nav-link <?php echo ($current_page == 'transaction_history.php') ? 'active text-warning' : ''; ?>" href="transaction_history.php">Transaction History</a>
+                <a class="nav-link <?php echo ($data['title'] == 'transaction_history.php') ? 'active text-warning' : ''; ?>" href="transaction_history.php">Transaction History</a>
             </li>
             <li class="nav-item mx-2">
-                <a class="nav-link <?php echo ($current_page == 'referral.php') ? 'active text-warning' : ''; ?>" href="referral.php">Referral</a>
+                <a class="nav-link <?php echo ($data['title'] == 'referral.php') ? 'active text-warning' : ''; ?>" href="referral.php">Referral</a>
             </li>
         </ul>
 

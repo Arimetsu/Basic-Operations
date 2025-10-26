@@ -217,7 +217,110 @@ class CustomerController extends Controller {
 
             $recipient_validation = $this->customerModel->validateRecipient($data['recipient_number'], $data['recipient_name']);
 
-            if(!$recipient_validation){
+            if(!$recipient_validation['status']){
+                $data = array_merge($data, [
+                    'recipient_number_error' => 'Invalid recipient account number or account name',
+                    'recipient_name_error' => 'Invalid recipient account number or account name'
+                ]);
+            }
+
+            $receiver = $this->customerModel->getAccountByNumber($data['recipient_number']);
+
+            if(empty($recipient_name)){
+                $data['recipient_name_error'] = 'Please enter recipient name.';
+            }
+
+            if(empty($amount)){
+                $data['amount_error'] = 'Please enter an amount.';
+            }
+            $amount_validation = $this->customerModel->validateAmount($data['from_account']);
+            $fee = 15.00;
+            $total = $data['amount'] + $fee;
+
+            if((float)$amount_validation->balance < $total){
+                $data['amount_error'] = 'Insufficient Funds';
+            }
+
+            if(strlen($message) >= 100){
+                $data['message_error'] = 'Pleaser enter 100 characters only';
+            }
+
+            if($data['from_account'] == $data['recipient_number']){
+                $data['other_error'] = 'You cannot transfer money to the same account fool.';
+            }
+
+            if(empty($data['from_account_error']) && empty($data['recipient_number_error']) && empty($data['recipient_name_error']) && empty($data['amount_error']) && empty($data['message_error']) && empty($data['other_error'])){
+                $temp_transaction_ref = 'TXN-PREVIEW-' . date('YmdHis') . '-' . strtoupper(bin2hex(random_bytes(3)));
+                $remaining_balance = (float)$amount_validation->balance - $total;
+                $sender_name = $_SESSION['customer_first_name'] . ' ' . $_SESSION['customer_last_name'] ?? 'Sender Name Unknown';
+
+                $data = array_merge($data, [
+                    'temp_transaction_ref' => $temp_transaction_ref,
+                    'fee' => $fee,
+                    'total_payment' => $total,
+                    'remaining_balance' => $remaining_balance,
+                    'sender_name' => $sender_name,
+                ]);
+
+                $this->view('customer/receipt', $data);
+            } else {
+                $accounts = $this->customerModel->getAccountsByCustomerId($_SESSION['customer_id']);
+                $data = array_merge($data, [
+                    'title' => 'Fund Transfer',
+                    'accounts' => $accounts
+                ]);
+                $this->view('customer/fund_transfer', $data);
+            }
+        } else {
+             $accounts = $this->customerModel->getAccountsByCustomerId($_SESSION['customer_id']);
+             $data = [
+                'title' => 'Fund Transfer',
+                'accounts' => $accounts
+            ];
+            $this->view('customer/fund_transfer', $data);
+        }
+    }
+
+    public function receipt(){
+        if($_SERVER['REQUEST_METHOD'] == 'POST'){
+         $from_account = trim($_POST['from_account']);
+            $recipient_number = trim($_POST['recipient_number']);
+            $recipient_name = trim($_POST['recipient_name']);
+            $amount = (float) trim($_POST['amount']);
+            $message = trim($_POST['message']);
+
+            $data = [
+                'customer_id' => $_SESSION['customer_id'],
+                'from_account' => $from_account,
+                'recipient_number' => $recipient_number,
+                'recipient_name' => $recipient_name,
+                'amount' => $amount,
+                'message' => $message,
+                'from_account_error' => '',
+                'recipient_number_error' => '',
+                'recipient_name_error' => '',
+                'amount_error' => '',
+                'message_error' => '',
+                'other_error' => '',
+            ];
+
+            if (empty($from_account)){
+                $data['from_account_error'] = 'Please select your account number.';
+            }
+
+            $sender = $this->customerModel->getAccountByNumber($data['from_account']);
+
+            if(!$sender){
+                $data['from_account_error'] = 'Please select your own account number.';
+            }
+
+            if(empty($recipient_number)){
+                $data['recipient_number_error'] = 'Please enter recipient account number.';
+            }
+
+            $recipient_validation = $this->customerModel->validateRecipient($data['recipient_number'], $data['recipient_name']);
+
+            if(!$recipient_validation['status']){
                 $data = array_merge($data, [
                     'recipient_number_error' => 'Invalid recipient account number or account name',
                     'recipient_name_error' => 'Invalid recipient account number or account name'
@@ -254,7 +357,7 @@ class CustomerController extends Controller {
 
                 $result = $this->customerModel->recordTransaction($transaction_ref, $sender->account_id, $receiver->account_id, $data['amount'], $fee, $data['message']);
 
-                header("Location: " . URLROOT . "/customer/dashboard");
+                header('Location: ' . URLROOT . '/customer/dashboard');
                 exit();
             } else {
                 $accounts = $this->customerModel->getAccountsByCustomerId($_SESSION['customer_id']);

@@ -235,7 +235,8 @@ class Customer extends Database{
         $this->db->query("
             SELECT 
                 a.account_number, 
-                CONCAT_WS(c.first_name, ' ', c.last_name) AS customer_name
+                CONCAT_WS(' ', c.first_name, c.last_name) AS customer_name,
+                c.customer_id
             FROM 
                 accounts a
             INNER JOIN 
@@ -247,7 +248,7 @@ class Customer extends Database{
         $result = $this->db->single();
 
         if(empty($result)){
-            return ['success' => false , 'error' => 'Invalid Account Number'];
+            return ['status' => false , 'error' => 'Invalid Account Number'];
         }
 
         if (strtolower(trim($result->customer_name)) !== strtolower(trim($recipient_name))) {
