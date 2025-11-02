@@ -22,7 +22,7 @@
             <!------------------- SEARCH BAR AND FILTER ---------------------------------------------------------------------------->
             <div class="d-flex align-items-center justify-content-between bg-light shadow-sm px-3 py-2 mb-4" style="max-width: 400px;">
                 <div class="d-flex align-items-center flex-grow-1">
-                    <input type="text" class="form-control border-0 bg-transparent" placeholder="Search" style="box-shadow: none;">
+                    <input type="text" class="form-control border-0 bg-transparent" placeholder="Search" style="box-shadow: none;" id="accountSearchInput">
                     <i class="bi bi-search text-muted "></i>
                 </div>
                 <div class="vr mx-2 my-2"></div>
@@ -39,16 +39,20 @@
                         <h6 class="fw-bold mb-2">Filter Accounts</h6>
                         <small class="fw-bold text-muted">By Account Type</small>
                         <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="savings">
-                            <label class="form-check-label" for="savings">Savings Accounts</label>
+                            <input class="form-check-input filter-checkbox" type="checkbox" id="filterSavings" data-account-type="savings">
+                            <label class="form-check-label" for="filterSavings">Savings Accounts</label>
                         </div>
                         <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="checking">
-                            <label class="form-check-label" for="checking">Checking Accounts</label>
+                            <input class="form-check-input filter-checkbox" type="checkbox" id="filterChecking" data-account-type="checking">
+                            <label class="form-check-label" for="filterChecking">Checking Accounts</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input filter-checkbox" type="checkbox" id="filterCredit" data-account-type="credit card">
+                            <label class="form-check-label" for="filterCredit">Credit Cards</label>
                         </div>
                         <div class="form-check mb-2">
-                            <input class="form-check-input" type="checkbox" id="credit">
-                            <label class="form-check-label" for="credit">Credit Cards</label>
+                            <input class="form-check-input filter-checkbox" type="checkbox" id="filterLoan" data-account-type="loan">
+                            <label class="form-check-label" for="filterLoan">Loan Accounts</label>
                         </div>
                         <small class="fw-bold text-muted">By Account Status</small>
                         <div class="form-check">
@@ -60,8 +64,8 @@
                             <label class="form-check-label" for="closed">Closed</label>
                         </div>
                         <div class="d-flex justify-content-between align-items-center">
-                            <button class="btn btn-success btn-sm rounded-pill px-3">Apply Filters</button>
-                            <button class="btn btn-link btn-sm text-muted">Reset</button>
+                            <button class="btn btn-success btn-sm rounded-pill px-3" id="applyFiltersBtn">Apply Filters</button>
+                            <button class="btn btn-link btn-sm text-muted" id="resetFiltersBtn">Reset</button>
                         </div>
                     </div>
                 </div>
@@ -95,8 +99,8 @@
                           <?php
               $firstAccountCardRendered = false; // Flag to mark the first card
               foreach ($groupedAccounts as $groupName => $accountsInGroup): ?>
-                  <div class="mb-4">
-                      <h6 class="fw-normal ms-2"><?= htmlspecialchars($groupName); ?></h6>
+                  <div class="mb-4 account-group-container" data-group-name="<?= htmlspecialchars($groupName); ?>">
+                      <h6 class="fw-normal ms-2 account-group-title"><?= htmlspecialchars($groupName); ?></h6>
                       <?php foreach ($accountsInGroup as $account):
                           $isSavingsAccount = str_contains(strtolower($account->account_type), 'savings');
                           $cardClasses = ['card', 'border-0', 'shadow-sm', 'mb-2', 'account-card'];
@@ -502,18 +506,18 @@
                                 $isCredit = ($typeName == 'deposit' || $typeName == 'transfer in' || $typeName == 'interest payment');
                                 
                                 // Define DEBIT transactions (Money going OUT)
-                                $isDebit = ($typeName == 'withdrawal' || $typeName == 'transfer out' || $typeName == 'fee' || $typeName == 'loan payment');
+                                $isDebit = ($typeName == 'withdrawal' || $typeName == 'transfer out' || $typeName == 'fee' || $typeName == 'loan payment'); // Added 'loan payment'
                                 
                                 if ($isCredit) {
                                     $iconClass = 'bi-arrow-down-left text-success';
                                     $amountSign = ''; 
                                     $amountColor = 'text-success';
-                                    $descriptionColor = 'text-success';
+                                    $descriptionColor = 'text-success'; // Descriptive text for Credit transactions
                                 } elseif ($isDebit) {
                                     $iconClass = 'bi-arrow-up-right text-danger';
                                     $amountSign = '-';
                                     $amountColor = 'text-danger';
-                                    $descriptionColor = 'text-dark';
+                                    $descriptionColor = 'text-dark'; // Descriptive text for Debit transactions
                                 } else {
                                     $iconClass = 'bi-exclamation-triangle-fill text-secondary';
                                     $amountSign = '';
@@ -558,176 +562,301 @@
 
 <script>
   document.addEventListener('DOMContentLoaded', function() {
-        // --- Alert Message Handling ---
-        const alerts = document.querySelectorAll('.alert-message');
-        if (alerts.length > 0) {
-            setTimeout(() => {
-                alerts.forEach(alert => {
-                    alert.style.transition = 'opacity 0.5s ease';
-                    alert.style.opacity = '0';
-                    setTimeout(() => alert.remove(), 500);
-                });
-            }, 5000);
-        }
-
-        // --- Delete Account Modal Handling ---
-        const deleteAccountModal = document.getElementById('deleteAccountModal');
-        if (deleteAccountModal) {
-            deleteAccountModal.addEventListener('show.bs.modal', function (event) {
-                const button = event.relatedTarget;
-                const accountId = button.dataset.accountId;
-                const accountName = button.dataset.accountName;
-                const accountNumber = button.dataset.accountNumber;
-
-                const modalMessage = deleteAccountModal.querySelector('#deleteAccountMessage');
-                modalMessage.innerHTML = `Are you sure you want to delete <br> <strong>${accountName} (${accountNumber})</strong>?`;
-
-                const deleteAccountIdInput = deleteAccountModal.querySelector('#deleteAccountIdInput');
-                deleteAccountIdInput.value = accountId;
+    // --- Alert Message Handling ---
+    const alerts = document.querySelectorAll('.alert-message');
+    if (alerts.length > 0) {
+        setTimeout(() => {
+            alerts.forEach(alert => {
+                alert.style.transition = 'opacity 0.5s ease';
+                alert.style.opacity = '0';
+                setTimeout(() => alert.remove(), 500);
             });
+        }, 5000);
+    }
+
+    // --- Delete Account Modal Handling ---
+    const deleteAccountModal = document.getElementById('deleteAccountModal');
+    if (deleteAccountModal) {
+        deleteAccountModal.addEventListener('show.bs.modal', function (event) {
+            const button = event.relatedTarget;
+            const accountId = button.dataset.accountId;
+            const accountName = button.dataset.accountName;
+            const accountNumber = button.dataset.accountNumber;
+
+            const modalMessage = deleteAccountModal.querySelector('#deleteAccountMessage');
+            modalMessage.innerHTML = `Are you sure you want to delete <br> <strong>${accountName} (${accountNumber})</strong>?`;
+
+            const deleteAccountIdInput = deleteAccountModal.querySelector('#deleteAccountIdInput');
+            deleteAccountIdInput.value = accountId;
+        });
+    }
+
+    // --- DOM Element References ---
+    const accountCards = document.querySelectorAll('.account-card');
+    const detailAccountNumber = document.getElementById('detail-account-number');
+    const detailAccountName = document.getElementById('detail-account-name');
+    const detailAccountType = document.getElementById('detail-account-type');
+    const detailBranch = document.getElementById('detail-branch');
+    const detailAvailableBalance = document.getElementById('detail-available-balance');
+    const balanceRow = document.getElementById('balance-row');
+    const creditCardDetails = document.getElementById('credit-card-details');
+    const detailAvailableCredit = document.getElementById('detail-available-credit');
+    const detailCreditLimit = document.getElementById('detail-credit-limit');
+    const transactionHistoryList = document.getElementById('transaction-history-list');
+    const accountSearchInput = document.getElementById('accountSearchInput');
+    const filterCheckboxes = document.querySelectorAll('.filter-checkbox');
+    const applyFiltersBtn = document.getElementById('applyFiltersBtn');
+    const resetFiltersBtn = document.getElementById('resetFiltersBtn');
+    const accountGroupContainers = document.querySelectorAll('.account-group-container');
+    const showHideAccountModalElement = document.getElementById('showHideAccountModal');
+
+
+    // --- Helper Function: Currency Formatting ---
+    function formatCurrency(amount) {
+        return parseFloat(amount).toLocaleString('en-PH', {
+            style: 'currency',
+            currency: 'PHP'
+        });
+    }
+
+    // --- Function to Update Main Content Area ---
+    function updateMainContent(card) {
+        // Update Account Details
+        detailAccountNumber.textContent = card.dataset.accountNumber;
+        detailAccountName.textContent = card.dataset.accountName;
+        detailAccountType.textContent = card.dataset.accountType;
+        detailBranch.textContent = card.dataset.branch;
+
+        const accountType = card.dataset.accountType.toLowerCase();
+
+        if (accountType.includes('credit card')) {
+            balanceRow.style.display = 'none';
+            creditCardDetails.style.display = 'block';
+            detailAvailableCredit.textContent = formatCurrency(card.dataset.availableCredit);
+            detailCreditLimit.textContent = formatCurrency(card.dataset.creditLimit);
+        } else {
+            balanceRow.style.display = 'flex';
+            creditCardDetails.style.display = 'none';
+            detailAvailableBalance.textContent = formatCurrency(card.dataset.availableBalance);
         }
 
-        // --- Account Card Click Handling ---
-        const accountCards = document.querySelectorAll('.account-card');
-        const detailAccountNumber = document.getElementById('detail-account-number');
-        const detailAccountName = document.getElementById('detail-account-name');
-        const detailAccountType = document.getElementById('detail-account-type');
-        const detailBranch = document.getElementById('detail-branch');
-        const detailAvailableBalance = document.getElementById('detail-available-balance');
-        const balanceRow = document.getElementById('balance-row');
-        const creditCardDetails = document.getElementById('credit-card-details');
-        const detailAvailableCredit = document.getElementById('detail-available-credit');
-        const detailCreditLimit = document.getElementById('detail-credit-limit');
-        const transactionHistoryList = document.getElementById('transaction-history-list');
+        // Update Transaction History
+        const transactions = JSON.parse(card.dataset.transactions || '[]');
+        transactionHistoryList.innerHTML = ''; // Clear existing transactions
 
-        function formatCurrency(amount) {
-            return parseFloat(amount).toLocaleString('en-PH', {
-                style: 'currency',
-                currency: 'PHP'
-            });
-        }
+        if (transactions.length > 0) {
+            transactions.forEach(transaction => {
 
-        function updateMainContent(card) {
-            // Update Account Details
-            detailAccountNumber.textContent = card.dataset.accountNumber;
-            detailAccountName.textContent = card.dataset.accountName;
-            detailAccountType.textContent = card.dataset.accountType;
-            detailBranch.textContent = card.dataset.branch;
+                const typeName = transaction.transaction_type_name.toLowerCase();
 
-            const accountType = card.dataset.accountType.toLowerCase();
+                // Define Credit (Money In) and Debit (Money Out) transactions
+                const isCredit = (typeName === 'deposit' || typeName === 'transfer in' || typeName === 'interest payment');
+                const isDebit = (typeName === 'withdrawal' || typeName === 'transfer out' || typeName === 'fee' || typeName === 'loan payment');
 
-            if (accountType.includes('credit card')) {
-                balanceRow.style.display = 'none';
-                creditCardDetails.style.display = 'block';
-                detailAvailableCredit.textContent = formatCurrency(card.dataset.availableCredit);
-                detailCreditLimit.textContent = formatCurrency(card.dataset.creditLimit);
-            } else {
-                balanceRow.style.display = 'flex';
-                creditCardDetails.style.display = 'none';
-                detailAvailableBalance.textContent = formatCurrency(card.dataset.availableBalance);
-            }
+                let iconClass;
+                let amountSign;
+                let amountColor;
+                let descriptionColor;
 
-            // Update Transaction History
-            const transactions = JSON.parse(card.dataset.transactions || '[]');
-            transactionHistoryList.innerHTML = ''; // Clear existing transactions
-
-           if (transactions.length > 0) {
-                transactions.forEach(transaction => {
-                    
-                    const typeName = transaction.transaction_type_name.toLowerCase();
-                    
-                    // Define Credit (Money In) and Debit (Money Out) transactions
-                    const isCredit = (typeName === 'deposit' || typeName === 'transfer in' || typeName === 'interest payment');
-                    const isDebit = (typeName === 'withdrawal' || typeName === 'transfer out' || typeName === 'fee' || typeName === 'loan payment');
-
-                    let iconClass;
-                    let amountSign;
-                    let amountColor;
-
-                    if (isCredit) {
-                        // Funds coming IN: Green arrow, no sign
-                        iconClass = 'bi-arrow-down-left text-success';
-                        amountSign = '';
-                        amountColor = 'text-success';
-                    } else if (isDebit) {
-                        // Funds going OUT: Red arrow, minus sign
-                        iconClass = 'bi-arrow-up-right text-danger';
-                        amountSign = '-';
-                        amountColor = 'text-danger';
-                    } else {
-                        // Fallback for unknown types
-                        iconClass = 'bi-exclamation-triangle-fill text-secondary';
-                        amountSign = '';
-                        amountColor = 'text-secondary';
-                    }
-
-                    const transactionDate = new Date(transaction.created_at);
-                    // Using 'en-US' or another locale that formats dates as desired, ensure PH locale support in your environment
-                    const formattedDate = transactionDate.toLocaleDateString('en-PH', { day: '2-digit', month: 'long', year: 'numeric' });
-                    const formattedTime = transactionDate.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit', hour12: true });
-
-                    const transactionItem = `
-                        <div class="list-group-item d-flex justify-content-between align-items-center border rounded mb-4" style="background-color: #D9D9D94D;">
-                            <div>
-                                <div class="row">
-                                    <div class="col-3 mt-2">
-                                        <i class="bi ${iconClass} fs-2"></i>
-                                    </div>
-                                    <div class="col-9">
-                                        <strong>${transaction.transaction_type_name}</strong><br>
-                                        <small class="text-muted">Transaction ID</small><br>
-                                        <small>${transaction.transaction_ref == null ? 'N/A' : transaction.transaction_ref}</small>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="text-end">
-                                <span class="${amountColor} fw-semibold">${amountSign}${formatCurrency(transaction.amount)}</span><br>
-                                <small class="text-muted">${formattedDate}<br>${formattedTime}</small>
-                            </div>
-                        </div>
-                    `;
-                    transactionHistoryList.innerHTML += transactionItem;
-                });
-            } else {
-                transactionHistoryList.innerHTML = '<p class="text-muted text-center">No transactions to display for this account.</p>';
-            }
-        }
-
-        // Add click event listener to each account card
-        accountCards.forEach(card => {
-            card.addEventListener('click', function() {
-                // Remove 'active' class from previously active card
-                const currentActive = document.querySelector('.account-card.active');
-                if (currentActive) {
-                    currentActive.classList.remove('active');
-                    // Reapply the specific savings account color if it was a savings account
-                    if (currentActive.classList.contains('savings-account')) {
-                        currentActive.style.backgroundColor = '#d6a3a341';
-                    } else {
-                         currentActive.style.backgroundColor = ''; // Reset to default or remove inline style
-                    }
+                if (isCredit) {
+                    // Funds coming IN: Green arrow, no sign
+                    iconClass = 'bi-arrow-down-left text-success';
+                    amountSign = '';
+                    amountColor = 'text-success';
+                    descriptionColor = 'text-success';
+                } else if (isDebit) {
+                    // Funds going OUT: Red arrow, minus sign
+                    iconClass = 'bi-arrow-up-right text-danger';
+                    amountSign = '-';
+                    amountColor = 'text-danger';
+                    descriptionColor = 'text-dark';
+                } else {
+                    // Fallback for unknown types
+                    iconClass = 'bi-exclamation-triangle-fill text-secondary';
+                    amountSign = '';
+                    amountColor = 'text-secondary';
+                    descriptionColor = 'text-secondary';
                 }
 
-                // Add 'active' class to the clicked card
-                this.classList.add('active');
-                this.style.backgroundColor = '#D9D9D9'; // Set active color
+                const transactionDate = new Date(transaction.created_at);
+                const formattedDate = transactionDate.toLocaleDateString('en-PH', { day: '2-digit', month: 'long', year: 'numeric' });
+                const formattedTime = transactionDate.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit', hour12: true });
 
-                // Update main content based on clicked card's data
-                updateMainContent(this);
+                const transactionItem = `
+                    <div class="list-group-item d-flex justify-content-between align-items-center border rounded mb-4" style="background-color: #D9D9D94D;">
+                        <div>
+                            <div class="row">
+                                <div class="col-3 mt-2">
+                                    <i class="bi ${iconClass} fs-2"></i>
+                                </div>
+                                <div class="col-9">
+                                    <strong class="${descriptionColor}">${transaction.transaction_type_name}</strong><br>
+                                    <small class="text-muted">Transaction ID</small><br>
+                                    <small>${transaction.transaction_ref == null ? 'N/A' : transaction.transaction_ref}</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="text-end">
+                            <span class="${amountColor} fw-semibold">${amountSign}${formatCurrency(transaction.amount)}</span><br>
+                            <small class="text-muted">${formattedDate}<br>${formattedTime}</small>
+                        </div>
+                    </div>
+                `;
+                transactionHistoryList.innerHTML += transactionItem;
             });
+        } else {
+            transactionHistoryList.innerHTML = '<p class="text-muted text-center">No transactions to display for this account.</p>';
+        }
+    }
+
+
+    // --- Function to Filter and Search Accounts ---
+    function filterAndSearchAccounts() {
+        const searchTerm = accountSearchInput.value.toLowerCase();
+        const selectedAccountTypes = Array.from(filterCheckboxes)
+                                        .filter(cb => cb.checked)
+                                        .map(cb => cb.dataset.accountType.toLowerCase());
+
+        // Get current show/hide status from the toggles in the modal
+        const showHideStates = {};
+        document.querySelectorAll('#showHideAccountModal .form-check-input').forEach(toggle => {
+            const accountId = toggle.id.replace('showHideToggle_', '');
+            showHideStates[accountId] = toggle.checked; // true for show, false for hide
         });
 
-        // Initialize content with the first active card on page load
-        const initialActiveCard = document.querySelector('.account-card.active');
-        if (initialActiveCard) {
-            // Ensure the initial active card has the correct active background
-            initialActiveCard.style.backgroundColor = '#D9D9D9';
-            updateMainContent(initialActiveCard);
-        } else if (accountCards.length > 0) {
-            // If no active card was initially marked, make the very first one active
-            accountCards[0].classList.add('active');
-            accountCards[0].style.backgroundColor = '#D9D9D9';
-            updateMainContent(accountCards[0]);
+        let firstVisibleCard = null;
+
+        accountGroupContainers.forEach(groupContainer => {
+            let groupHasVisibleCards = false;
+            const cardsInGroup = groupContainer.querySelectorAll('.account-card');
+            const groupTitle = groupContainer.querySelector('.account-group-title');
+
+            cardsInGroup.forEach(card => {
+                const accountId = card.dataset.accountId;
+                const accountName = card.dataset.accountName.toLowerCase();
+                const accountNumber = card.dataset.accountNumber.toLowerCase();
+                const accountType = card.dataset.accountType.toLowerCase();
+
+                const matchesSearch = accountName.includes(searchTerm) || accountNumber.includes(searchTerm);
+                const matchesTypeFilter = selectedAccountTypes.length === 0 || selectedAccountTypes.includes(accountType);
+                // Default to show if no toggle exists for this account, or if the toggle is checked
+                const isExplicitlyShown = showHideStates[accountId] === undefined || showHideStates[accountId];
+
+                if (matchesSearch && matchesTypeFilter && isExplicitlyShown) {
+                    card.style.display = ''; // Show card
+                    groupHasVisibleCards = true;
+                    if (!firstVisibleCard) {
+                        firstVisibleCard = card;
+                    }
+                } else {
+                    card.style.display = 'none'; // Hide card
+                }
+            });
+
+            // Show/hide group title and container based on whether it has visible cards
+            if (groupHasVisibleCards) {
+                groupContainer.style.display = '';
+                if (groupTitle) groupTitle.style.display = '';
+            } else {
+                groupContainer.style.display = 'none';
+                if (groupTitle) groupTitle.style.display = 'none';
+            }
+        });
+
+        // Update active card and main content based on the *currently visible* cards
+        const currentActive = document.querySelector('.account-card.active');
+        if (currentActive) {
+            currentActive.classList.remove('active');
+            currentActive.style.backgroundColor = ''; // Reset background
+        }
+
+        if (firstVisibleCard) {
+            firstVisibleCard.classList.add('active');
+            firstVisibleCard.style.backgroundColor = '#D9D9D9';
+            updateMainContent(firstVisibleCard);
+        } else {
+            // If no accounts are visible after filtering, clear main content
+            detailAccountNumber.textContent = 'N/A';
+            detailAccountName.textContent = 'N/A';
+            detailAccountType.textContent = 'N/A';
+            detailBranch.textContent = 'N/A';
+            balanceRow.style.display = 'flex'; // Default to showing balance row
+            creditCardDetails.style.display = 'none';
+            detailAvailableBalance.textContent = formatCurrency(0);
+            transactionHistoryList.innerHTML = '<p class="text-muted text-center">No accounts found matching your criteria.</p>';
+        }
+    }
+
+    // --- Event Listeners for Search and Account Type Filters ---
+    accountSearchInput.addEventListener('input', filterAndSearchAccounts);
+
+    applyFiltersBtn.addEventListener('click', function() {
+        filterAndSearchAccounts();
+        // Close the dropdown after applying filters
+        const dropdownElement = document.querySelector('.dropdown-menu.show');
+        if (dropdownElement) {
+            const bsDropdown = bootstrap.Dropdown.getInstance(dropdownElement.previousElementSibling);
+            if (bsDropdown) bsDropdown.hide();
         }
     });
+
+    resetFiltersBtn.addEventListener('click', function() {
+        filterCheckboxes.forEach(cb => cb.checked = false);
+        accountSearchInput.value = ''; // Clear search input on reset
+        filterAndSearchAccounts();
+        // Close the dropdown after resetting filters
+        const dropdownElement = document.querySelector('.dropdown-menu.show');
+        if (dropdownElement) {
+            const bsDropdown = bootstrap.Dropdown.getInstance(dropdownElement.previousElementSibling);
+            if (bsDropdown) bsDropdown.hide();
+        }
+    });
+
+
+    // --- Show/Hide Account Modal Logic ---
+    // Add event listeners to the show/hide toggles
+    document.querySelectorAll('#showHideAccountModal .form-check-input').forEach(toggle => {
+        toggle.addEventListener('change', filterAndSearchAccounts); // Call filterAndSearchAccounts directly
+    });
+
+    // Also, ensure filters are applied when the modal is initially shown
+    if (showHideAccountModalElement) {
+        showHideAccountModalElement.addEventListener('shown.bs.modal', filterAndSearchAccounts);
+    }
+
+
+    // --- Add click event listener to each account card ---
+    accountCards.forEach(card => {
+        card.addEventListener('click', function() {
+            // Remove 'active' class from previously active card
+            const currentActive = document.querySelector('.account-card.active');
+            if (currentActive) {
+                currentActive.classList.remove('active');
+                currentActive.style.backgroundColor = ''; // Reset to default or remove inline style
+            }
+
+            // Add 'active' class to the clicked card
+            this.classList.add('active');
+            this.style.backgroundColor = '#D9D9D9'; // Set active color
+
+            // Update main content based on clicked card's data
+            updateMainContent(this);
+        });
+    });
+
+    // --- Initialize content with the first active/visible card on page load ---
+    // This needs to happen AFTER all filtering logic is set up
+    filterAndSearchAccounts(); // Apply all filters (search, type, show/hide) initially
+
+    const initialActiveCard = document.querySelector('.account-card.active');
+    if (!initialActiveCard) { // If no active card found after initial filtering
+        // Find the very first visible card after filtering and make it active
+        const firstTrulyVisibleCard = document.querySelector('.account-card[style*="display: block"], .account-card:not([style*="display: none"])');
+        if (firstTrulyVisibleCard) {
+            firstTrulyVisibleCard.classList.add('active');
+            firstTrulyVisibleCard.style.backgroundColor = '#D9D9D9';
+            updateMainContent(firstTrulyVisibleCard);
+        }
+    }
+});
 </script>
