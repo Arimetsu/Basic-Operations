@@ -376,4 +376,217 @@ class CustomerController extends Controller {
             $this->view('customer/fund_transfer', $data);
         }
     }
+
+    public function transaction_history() {
+        if (!isset($_SESSION['customer_id'])) {
+            header('Location: ' . URLROOT . '/customer/login');
+            exit();
+        }
+
+        $customer_id = $_SESSION['customer_id'];
+        $limit = 20;
+
+        $current_page = isset($_GET['page']) ? (int) $_GET['page'] : 1;
+        $current_page = max(1, $current_page);
+        $offset = ($current_page - 1) * $limit;
+
+        $filters = [
+            'account_id' => isset($_GET['account_id']) ? filter_var($_GET['account_id'], FILTER_SANITIZE_STRING) : 'all',
+            'type_name' => isset($_GET['type_name']) ? filter_var($_GET['type_name'], FILTER_SANITIZE_STRING) : 'All',
+            'start_date' => isset($_GET['start_date']) ? filter_var($_GET['start_date'], FILTER_SANITIZE_STRING) : '',
+            'end_date' => isset($_GET['end_date']) ? filter_var($_GET['end_date'], FILTER_SANITIZE_STRING) : '',
+        ];
+
+        $accounts = $this->customerModel->getLinkedAccountsForFilter($customer_id);
+        $rawTransactionTypes = $this->customerModel->getTransactionTypes();
+        $transactionTypes = array_merge(['All'], array_column($rawTransactionTypes, 'type_name'));
+
+        $transactionData = $this->customerModel->getAllTransactionsByCustomerId(
+            $customer_id, 
+            $filters,
+            $limit, 
+            $offset
+        );
+
+        $total_transactions = $transactionData['total'];
+        $total_pages = ceil($total_transactions / $limit);
+
+        $data = [
+            'title' => 'Transaction History',
+            'accounts' => $accounts,
+            'transactions' => $transactionData['transactions'],
+            'filters' => $filters,
+            'transaction_types' => $transactionTypes,
+            'pagination' => [
+                'current_page' => $current_page,
+                'total_pages' => $total_pages,
+                'total_transactions' => $total_transactions,
+                'limit' => $limit,
+                'url_query' => http_build_query(array_filter($_GET, fn($key) => $key !== 'page', ARRAY_FILTER_USE_KEY))
+            ]
+        ];
+
+        $this->view('customer/transaction_history', $data);
+    }
+
+    // -- FOR EXPORT --
+    public function export_transactions() {
+        if (!isset($_SESSION['customer_id'])) {
+            header('Location: ' . URLROOT . '/customer/login');
+            exit();
+        }
+        $customer_id = $_SESSION['customer_id'];
+
+        // 1. Get the filter data (account_id, type_name, start_date, end_date)
+        $filters = [
+            'account_id' => $_GET['account_id'] ?? 'all',
+            'type_name'  => $_GET['type_name'] ?? 'All',
+            'start_date' => $_GET['start_date'] ?? '',
+            'end_date'   => $_GET['end_date'] ?? '',
+        ];
+        $exportType = strtolower($_GET['type'] ?? 'csv');
+
+        // 2. Call a model method to fetch ALL transactions matching the filters
+        // Pass customer_id and filters
+        $transactions = $this->customerModel->getAllFilteredTransactions($customer_id, $filters); 
+
+        // 3. Generate and output the file based on $exportType
+        if ($exportType === 'csv') {
+            $this->generateCSV($transactions);
+        } elseif ($exportType === 'pdf') {
+            // You would need a PDF library integrated for this (TCPDF seems to be set up)
+            $this->generatePDF($transactions);
+        } else {
+            // Handle invalid type
+            header('Location: ' . URLROOT . '/customer/transaction_history');
+            exit;
+        }
+    }
+    
+    protected function generateCSV($transactions) {
+        // Set headers for download
+        header('Content-Type: text/csv');
+        header('Content-Disposition: attachment; filename="transactions_' . date('Ymd_His') . '.csv"');
+        header('Pragma: no-cache');
+        header('Expires: 0');
+
+        // Open a temporary stream for output
+        $output = fopen('php://output', 'w');
+
+        // Define CSV Column Headers (adjust these to match your data structure)
+        $headers = ['Date', 'Time', 'Description', 'Reference', 'Account Number', 'Type', 'Amount (PHP)'];
+        fputcsv($output, $headers);
+
+        // Write transaction data
+        foreach ($transactions as $t) {
+            $dateTime = strtotime($t->created_at);
+            $amountSign = $t->signed_amount < 0 ? '-' : '+';
+
+            $row = [
+                date('Y-m-d', $dateTime),
+                date('h:i:s A', $dateTime),
+                $t->description,
+                $t->transaction_ref,
+                $t->account_number,
+                $t->transaction_type,
+                $amountSign . number_format(abs($t->signed_amount), 2, '.', ''), // Use plain format for export
+            ];
+            fputcsv($output, $row);
+        }
+
+        // Close the stream and terminate script
+        fclose($output);
+        exit;
+    }
+
+    protected function generatePDF($transactions) {
+        require_once ROOT_PATH . '/vendor/autoload.php';
+        $pdf = new TCPDF(PDF_PAGE_ORIENTATION, PDF_UNIT, PDF_PAGE_FORMAT, true, 'UTF-8', false);
+
+        // 2. Set document information
+        $pdf->SetCreator(PDF_CREATOR);
+        $pdf->SetAuthor('Your Bank');
+        $pdf->SetTitle('Transaction History');
+        $pdf->SetSubject('Customer Transaction Report');
+
+        // 3. Remove default header/footer
+        $pdf->setPrintHeader(false);
+        $pdf->setPrintFooter(false);
+
+        // 4. Set auto page breaks
+        $pdf->SetAutoPageBreak(TRUE, PDF_MARGIN_BOTTOM);
+
+        // 5. Set default font and add a page
+        $pdf->SetFont('helvetica', '', 10);
+        $pdf->AddPage();
+
+        // --- Start PDF Content Generation ---
+
+        // Title
+        $pdf->SetFont('helvetica', 'B', 16);
+        $pdf->Cell(0, 15, 'Transaction History Report', 0, 1, 'C');
+        
+        // Summary
+        $pdf->SetFont('helvetica', '', 10);
+        $pdf->Cell(0, 5, 'Report Generated: ' . date('Y-m-d H:i:s'), 0, 1, 'L');
+        $pdf->Cell(0, 5, 'Total Transactions: ' . count($transactions), 0, 1, 'L');
+        $pdf->Ln(5); // Line break
+
+        // HTML Table for easy styling and structure
+        $html = '<table cellspacing="0" cellpadding="5" border="1" style="border-collapse: collapse;">';
+        
+        // Table Header
+        $html .= '<tr style="background-color: #f0f0f0; font-weight: bold;">
+                    <td width="15%">Date & Time</td>
+                    <td width="30%">Details</td>
+                    <td width="25%">Account & Type</td>
+                    <td width="15%" align="right">Amount</td>
+                    <td width="15%">Status</td>
+                </tr>';
+
+        // Table Body
+        if (empty($transactions)) {
+            $html .= '<tr><td colspan="5" align="center">No transactions found.</td></tr>';
+        } else {
+            foreach ($transactions as $t) {
+                $isDebit = $t->signed_amount < 0;
+                $amountSign = $isDebit ? '-' : '+';
+                $amountColor = $isDebit ? 'color: #D9534F;' : 'color: #5CB85C;'; // CSS colors for red/green
+
+                // Use the formatCurrency function (must be available in this scope)
+                $formattedAmount = $amountSign . number_format(abs($t->signed_amount), 2, '.', '');
+
+                $html .= '<tr>
+                            <td>' . date('d M Y, H:i A', strtotime($t->created_at)) . '</td>
+                            <td>' . htmlspecialchars($t->description) . '<br><span style="font-size: 8pt;">Ref: ' . htmlspecialchars($t->transaction_ref) . '</span></td>
+                            <td>' . htmlspecialchars($t->account_number) . '<br><span style="font-size: 8pt;">' . htmlspecialchars($t->transaction_type) . '</span></td>
+                            <td align="right" style="' . $amountColor . ' font-weight: bold;">' . $formattedAmount . '</td>
+                            <td>' . ($isDebit ? 'Debit' : 'Credit') . '</td>
+                        </tr>';
+            }
+        }
+
+        $html .= '</table>';
+
+        // Output the HTML content
+        $pdf->writeHTML($html, true, false, true, false, '');
+
+        // 6. Close and output PDF document
+        // I = inline (to browser), D = download
+        $pdf->Output('transaction_history_' . date('Ymd') . '.pdf', 'D');
+        exit;
+    }
+
+    public function referral(){
+        if (!isset($_SESSION['customer_id'])) {
+            header('Location: ' . URLROOT . '/customer/login');
+            exit();
+        }
+
+        $data = [
+            'title' => 'Referral'
+        ];
+
+        $this->view('customer/referral', $data);
+    }
 }

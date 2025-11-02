@@ -386,9 +386,195 @@ class Customer extends Database{
                 accounts a
             WHERE 
                 a.customer_id = :id
+            AND
+                a.is_locked = 0
         ");
 
         $this->db->bind(':id', $customer_id);
+        return $this->db->resultSet();
+    }
+
+    // transaction 
+    public function getTransactionTypes() {
+        $this->db->query("SELECT type_name FROM transaction_types ORDER BY type_name");
+        return $this->db->resultSet();
+    }
+
+    public function getLinkedAccountsForFilter($customer_id) {
+        $this->db->query("
+            SELECT
+                a.account_id,
+                a.account_number,
+                act.type_name AS account_type
+            FROM
+                customer_linked_accounts cla
+            INNER JOIN accounts a ON cla.account_id = a.account_id
+            LEFT JOIN account_types act ON a.account_type_id = act.account_type_id
+            WHERE
+                cla.customer_id = :customer_id AND cla.is_active = 1
+            ORDER BY a.account_number
+        ");
+        $this->db->bind(':customer_id', $customer_id);
+        return $this->db->resultSet();
+    }
+
+    public function getAllTransactionsByCustomerId($customer_id, $filters = [], $limit = 20, $offset = 0) {
+        // SQL logic to determine if the transaction is a credit (in) or debit (out)
+        $sql_signed_amount = "
+            CASE tt.type_name
+                WHEN 'Deposit' THEN t.amount
+                WHEN 'Transfer In' THEN t.amount
+                WHEN 'Interest Payment' THEN t.amount
+                -- Debits (will show as negative in the SQL result)
+                WHEN 'Withdrawal' THEN -t.amount
+                WHEN 'Transfer Out' THEN -t.amount
+                WHEN 'Fee' THEN -t.amount
+                WHEN 'Loan Payment' THEN -t.amount
+                ELSE 0
+            END
+        ";
+        $sql_select = "
+            SELECT
+                t.transaction_id,
+                t.transaction_ref,
+                t.description,
+                t.created_at,
+                tt.type_name AS transaction_type,
+                a.account_number,
+                a.account_id,
+                ({$sql_signed_amount}) AS signed_amount,
+                t.amount AS raw_amount
+            FROM
+                customer_linked_accounts cla
+            INNER JOIN accounts a ON cla.account_id = a.account_id
+            INNER JOIN transactions t ON a.account_id = t.account_id
+            LEFT JOIN transaction_types tt ON t.transaction_type_id = tt.transaction_type_id
+            WHERE
+                cla.customer_id = :customer_id
+        ";
+
+        $params = [':customer_id' => $customer_id];
+        $conditions = [];
+
+        // Filter by Account ID
+        if (!empty($filters['account_id']) && $filters['account_id'] !== 'all') {
+            $conditions[] = "a.account_id = :account_id";
+            $params[':account_id'] = $filters['account_id'];
+        }
+        
+        // Filter by Transaction Type
+        if (!empty($filters['type_name']) && $filters['type_name'] !== 'All') {
+            $conditions[] = "tt.type_name = :type_name";
+            $params[':type_name'] = $filters['type_name'];
+        }
+
+        // Filter by Date Range
+        if (!empty($filters['start_date'])) {
+            $conditions[] = "DATE(t.created_at) >= :start_date";
+            $params[':start_date'] = $filters['start_date'];
+        }
+        if (!empty($filters['end_date'])) {
+            $conditions[] = "DATE(t.created_at) <= :end_date";
+            $params[':end_date'] = $filters['end_date'];
+        }
+
+        // Append all WHERE conditions
+        if (!empty($conditions)) {
+            $sql_select .= " AND " . implode(" AND ", $conditions);
+        }
+
+        // --- PAGINATION COUNT ---
+        $sql_count = "SELECT COUNT(*) AS total FROM ({$sql_select}) AS subquery";
+        $this->db->query($sql_count);
+        foreach ($params as $key => $value) {
+            $this->db->bind($key, $value);
+        }
+        $total_transactions = $this->db->single()->total;
+
+        // --- FETCH PAGINATED RESULTS ---
+        $sql_order_limit = " ORDER BY t.created_at DESC LIMIT :limit OFFSET :offset";
+        
+        $this->db->query($sql_select . $sql_order_limit);
+        $this->db->bind(':limit', $limit, PDO::PARAM_INT);
+        $this->db->bind(':offset', $offset, PDO::PARAM_INT);
+        
+        // Re-bind all filter parameters
+        foreach ($params as $key => $value) {
+            $this->db->bind($key, $value);
+        }
+        $transactions = $this->db->resultSet();
+
+        return [
+            'transactions' => $transactions,
+            'total' => $total_transactions,
+            'limit' => $limit,
+            'offset' => $offset
+        ];
+    }
+
+    public function getAllFilteredTransactions($customer_id, $filters) {
+        // SQL logic to determine if the transaction is a credit (in) or debit (out)
+        // This logic should match the one in getAllTransactionsByCustomerId
+        $sql_signed_amount = "
+            CASE tt.type_name
+                WHEN 'Deposit' THEN t.amount
+                WHEN 'Transfer In' THEN t.amount
+                WHEN 'Interest Payment' THEN t.amount
+                -- Debits (will show as negative in the SQL result)
+                WHEN 'Withdrawal' THEN -t.amount
+                WHEN 'Transfer Out' THEN -t.amount
+                WHEN 'Fee' THEN -t.amount
+                WHEN 'Loan Payment' THEN -t.amount
+                ELSE 0
+            END
+        ";
+
+        $sql = "SELECT 
+                    t.*, 
+                    tt.type_name AS transaction_type, 
+                    a.account_number, 
+                    ({$sql_signed_amount}) AS signed_amount,
+                    t.amount AS raw_amount -- Also include raw_amount if 't.amount' is not raw
+                FROM transactions t
+                JOIN transaction_types tt ON t.transaction_type_id = tt.transaction_type_id -- Use transaction_type_id for join
+                JOIN accounts a ON t.account_id = a.account_id
+                -- Crucially, ensure we only get transactions for accounts linked to this customer
+                INNER JOIN customer_linked_accounts cla ON a.account_id = cla.account_id
+                WHERE cla.customer_id = :customer_id AND cla.is_active = 1"; // Only active linked accounts
+
+        $params = [':customer_id' => $customer_id]; // Note: using prefixed params here for consistency
+
+        // Apply Filters
+        if (!empty($filters['account_id']) && $filters['account_id'] !== 'all') {
+            $sql .= ' AND a.account_id = :account_id'; // Filter by account_id on 'a' (accounts) table
+            $params[':account_id'] = $filters['account_id'];
+        }
+
+        if (!empty($filters['type_name']) && $filters['type_name'] !== 'All') {
+            $sql .= ' AND tt.type_name = :type_name';
+            $params[':type_name'] = $filters['type_name'];
+        }
+
+        if (!empty($filters['start_date'])) {
+            $sql .= ' AND DATE(t.created_at) >= :start_date';
+            $params[':start_date'] = $filters['start_date'];
+        }
+
+        if (!empty($filters['end_date'])) {
+            $sql .= ' AND DATE(t.created_at) <= :end_date';
+            $params[':end_date'] = $filters['end_date'];
+        }
+
+        // Order by date (important for historical context)
+        $sql .= ' ORDER BY t.created_at DESC';
+
+        $this->db->query($sql);
+        
+        // Bind parameters
+        foreach ($params as $param_name => $value) {
+            $this->db->bind($param_name, $value);
+        }
+
         return $this->db->resultSet();
     }
 }

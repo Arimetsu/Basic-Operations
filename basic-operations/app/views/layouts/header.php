@@ -1,7 +1,3 @@
-<?php
-$current_page = basename($_SERVER['PHP_SELF']);
-?>
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -13,11 +9,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
-    
-
-
-
-
     <nav class="navbar navbar-expand-lg navbar-dark" style="background-color: #003631;">
     <div class="container-fluid px-4">
 
@@ -46,10 +37,10 @@ $current_page = basename($_SERVER['PHP_SELF']);
                 <a class="nav-link <?php echo ($data['title'] == 'Fund Transfer') ? 'active text-warning' : ''; ?>" href=<?= URLROOT . "/customer/fund_transfer" ?>>Fund Transfer</a>
             </li>
             <li class="nav-item mx-2">
-                <a class="nav-link <?php echo ($data['title'] == 'transaction_history.php') ? 'active text-warning' : ''; ?>" href="transaction_history.php">Transaction History</a>
+                <a class="nav-link <?php echo ($data['title'] == 'Transaction History') ? 'active text-warning' : ''; ?>" href=<?= URLROOT . "/customer/transaction_history" ?>>Transaction History</a>
             </li>
             <li class="nav-item mx-2">
-                <a class="nav-link <?php echo ($data['title'] == 'referral.php') ? 'active text-warning' : ''; ?>" href="referral.php">Referral</a>
+                <a class="nav-link <?php echo ($data['title'] == 'Referral') ? 'active text-warning' : ''; ?>" href=<?= URLROOT . "/customer/referral" ?>>Referral</a>
             </li>
         </ul>
 
