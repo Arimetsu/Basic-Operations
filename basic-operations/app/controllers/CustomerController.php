@@ -501,81 +501,106 @@ class CustomerController extends Controller {
 
     protected function generatePDF($transactions) {
         require_once ROOT_PATH . '/vendor/autoload.php';
+
+        // --- Compute Date Range ---
+        if (!empty($transactions)) {
+            $dates = array_map(fn($t) => strtotime($t->created_at), $transactions);
+            $startDate = min($dates);
+            $endDate = max($dates);
+            $dateRange = date('j M Y', $startDate) . ' - ' . date('j M Y', $endDate);
+        } else {
+            $dateRange = "No transactions";
+        }
+
         $pdf = new TCPDF(PDF_PAGE_ORIENTATION, PDF_UNIT, PDF_PAGE_FORMAT, true, 'UTF-8', false);
 
-        // 2. Set document information
-        $pdf->SetCreator(PDF_CREATOR);
-        $pdf->SetAuthor('Your Bank');
-        $pdf->SetTitle('Transaction History');
-        $pdf->SetSubject('Customer Transaction Report');
-
-        // 3. Remove default header/footer
         $pdf->setPrintHeader(false);
         $pdf->setPrintFooter(false);
 
-        // 4. Set auto page breaks
-        $pdf->SetAutoPageBreak(TRUE, PDF_MARGIN_BOTTOM);
+        $pdf->SetCreator(PDF_CREATOR);
+        $pdf->SetAuthor('Your Bank');
+        $pdf->SetTitle('Statement of Account');
+        $pdf->SetSubject('Customer Statement');
 
-        // 5. Set default font and add a page
+        $pdf->SetAutoPageBreak(TRUE, PDF_MARGIN_BOTTOM);
         $pdf->SetFont('helvetica', '', 10);
         $pdf->AddPage();
 
-        // --- Start PDF Content Generation ---
+        $logo = ROOT_PATH . '/public/img/logo.jpg';
+        $customer_name = $_SESSION['customer_first_name'] . ' ' . $_SESSION['customer_last_name'];
 
-        // Title
-        $pdf->SetFont('helvetica', 'B', 16);
-        $pdf->Cell(0, 15, 'Transaction History Report', 0, 1, 'C');
-        
-        // Summary
-        $pdf->SetFont('helvetica', '', 10);
-        $pdf->Cell(0, 5, 'Report Generated: ' . date('Y-m-d H:i:s'), 0, 1, 'L');
-        $pdf->Cell(0, 5, 'Total Transactions: ' . count($transactions), 0, 1, 'L');
-        $pdf->Ln(5); // Line break
+        $headerHTML = '
+            <table width="100%">
+                <tr>
+                    <!-- Logo -->
+                    <td width="50%">
+                        <img src="' . $logo . '" height="40" />
+                        <span style="font-size:16px; font-weight:bold;">EVERGREEN</span>
+                    </td>
 
-        // HTML Table for easy styling and structure
+                    <!-- Title + Statement Date -->
+                    <td width="50%" align="right" style="text-align:right;">
+                        <span style="font-size:16px; font-weight:bold;">Statement of Account</span><br>
+                        <span style="font-size:10px;">Statement date: ' . date('j F Y') . '</span>
+                    </td>
+                </tr>
+            </table>
+            <br><hr><br>
+        ';
+
+        $pdf->writeHTML($headerHTML, true, false, true, false, '');
+
+        $pdf->SetFont('helvetica', '', 11);
+        $pdf->Cell(40, 6, 'Customer Name:', 0, 0, 'L');  
+        $pdf->SetFont('helvetica', 'B', 11);
+        $pdf->Cell(0, 6, htmlspecialchars($customer_name), 0, 1, 'L');
+
+        $pdf->SetFont('helvetica', '', 11);
+        $pdf->Cell(0, 6, "Transactions (" . $dateRange . ")", 0, 1, 'L');
+        $pdf->Ln(3);
         $html = '<table cellspacing="0" cellpadding="5" border="1" style="border-collapse: collapse;">';
-        
-        // Table Header
-        $html .= '<tr style="background-color: #f0f0f0; font-weight: bold;">
-                    <td width="15%">Date & Time</td>
-                    <td width="30%">Details</td>
-                    <td width="25%">Account & Type</td>
-                    <td width="15%" align="right">Amount</td>
-                    <td width="15%">Status</td>
-                </tr>';
 
-        // Table Body
+        $html .= '
+            <tr style="background-color:#f0f0f0; font-weight:bold;">
+                <td width="25%">Date & Time</td>
+                <td width="40%">Description</td>
+                <td width="15%">Account</td>
+                <td width="20%" align="right">Amount(PHP)</td>
+            </tr>
+        ';
+
         if (empty($transactions)) {
             $html .= '<tr><td colspan="5" align="center">No transactions found.</td></tr>';
         } else {
             foreach ($transactions as $t) {
                 $isDebit = $t->signed_amount < 0;
-                $amountSign = $isDebit ? '-' : '+';
-                $amountColor = $isDebit ? 'color: #D9534F;' : 'color: #5CB85C;'; // CSS colors for red/green
+                $formattedAmount = number_format(abs($t->signed_amount), 2);
+                $color = $isDebit ? '#D9534F' : '#5CB85C';
 
-                // Use the formatCurrency function (must be available in this scope)
-                $formattedAmount = $amountSign . number_format(abs($t->signed_amount), 2, '.', '');
-
-                $html .= '<tr>
-                            <td>' . date('d M Y, H:i A', strtotime($t->created_at)) . '</td>
-                            <td>' . htmlspecialchars($t->description) . '<br><span style="font-size: 8pt;">Ref: ' . htmlspecialchars($t->transaction_ref) . '</span></td>
-                            <td>' . htmlspecialchars($t->account_number) . '<br><span style="font-size: 8pt;">' . htmlspecialchars($t->transaction_type) . '</span></td>
-                            <td align="right" style="' . $amountColor . ' font-weight: bold;">' . $formattedAmount . '</td>
-                            <td>' . ($isDebit ? 'Debit' : 'Credit') . '</td>
-                        </tr>';
+                $html .= '
+                    <tr>
+                        <td>' . date('d M Y, h:i A', strtotime($t->created_at)) . '</td>
+                        <td>' . htmlspecialchars($t->description) . '<br>
+                            <span style="font-size:8pt;">Ref: ' . htmlspecialchars($t->transaction_ref) . '</span>
+                        </td>
+                        <td>' . htmlspecialchars($t->account_number) . '<br>
+                            <span style="font-size:8pt;">' . htmlspecialchars($t->transaction_type) . '</span>
+                        </td>
+                        <td align="right" style="font-weight:bold; color:' . $color . ';">' 
+                            . ($isDebit ? '-' : '+') . $formattedAmount . '</td>
+                    </tr>
+                ';
             }
         }
 
         $html .= '</table>';
 
-        // Output the HTML content
         $pdf->writeHTML($html, true, false, true, false, '');
 
-        // 6. Close and output PDF document
-        // I = inline (to browser), D = download
-        $pdf->Output('transaction_history_' . date('Ymd') . '.pdf', 'D');
+        $pdf->Output('statement_' . date('Ymd') . '.pdf', 'D');
         exit;
     }
+
 
     public function referral(){
         if (!isset($_SESSION['customer_id'])) {

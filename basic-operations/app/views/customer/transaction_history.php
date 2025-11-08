@@ -126,9 +126,9 @@ $queryBase = buildFilterQuery($filters);
                     <thead class="bg-light sticky-top shadow-sm">
                         <tr>
                             <th class="py-3 px-4 fw-semibold" style="color: #003631; width: 10%;">Status</th>
+                            <th class="py-3 px-4 fw-semibold" style="color: #003631; width: 25%;">Date and Time</th>
                             <th class="py-3 px-4 fw-semibold" style="color: #003631; width: 25%;">Details</th>
                             <th class="py-3 px-4 fw-semibold" style="color: #003631; width: 20%;">Account & Type</th>
-                            <th class="py-3 px-4 fw-semibold" style="color: #003631; width: 25%;">Date and Time</th>
                             <th class="py-3 px-4 fw-semibold text-end" style="color: #003631; width: 20%;">Amount</th>
                         </tr>
                     </thead>
@@ -151,15 +151,15 @@ $queryBase = buildFilterQuery($filters);
                                     <i class="bi <?php echo $iconClass; ?> <?php echo $colorClass; ?> fs-4"></i>
                                 </td>
                                 <td class="px-4">
+                                    <?php echo date('d M Y, h:i A', strtotime($t->created_at)); ?>
+                                </td>
+                                <td class="px-4">
                                     <div class="fw-bold"><?php echo htmlspecialchars($t->description); ?></div>
                                     <small class="text-muted">Ref: <?php echo htmlspecialchars($t->transaction_ref); ?></small>
                                 </td>
                                 <td class="px-4">
                                     <div class="fw-bold"><?php echo htmlspecialchars($t->account_number); ?></div>
                                     <small class="text-muted"><?php echo htmlspecialchars($t->transaction_type); ?></small>
-                                </td>
-                                <td class="px-4">
-                                    <?php echo date('d M Y, h:i A', strtotime($t->created_at)); ?>
                                 </td>
                                 <td class="px-4 text-end <?php echo $colorClass; ?> rounded-end-4 fw-bold">
                                     <?php 
