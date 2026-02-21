@@ -172,20 +172,36 @@ class Customer extends Database{
 
         // Step 1: Get account_id and account_type by account_number AND VERIFY IT BELONGS TO THE CUSTOMER
         $this->db->query("
-            SELECT a.account_id, a.account_type_id, a.customer_id
+            SELECT a.account_id, a.account_type_id, a.customer_id, a.is_active, a.is_locked
             FROM Accounts a
-            WHERE a.account_number = :account_number AND a.is_active = 1
+            WHERE a.account_number = :account_number
         ");
         $this->db->bind(':account_number', $data['account_number']);
         $account = $this->db->single();
 
         if (!$account) {
-            return ['success' => false, 'error' => 'Account number not found.'];
+            return ['success' => false, 'error' => 'Account number "' . htmlspecialchars($data['account_number']) . '" not found in our system. Please check the account number and try again.'];
         }
 
         // SECURITY CHECK: Verify the account belongs to the logged-in customer
         if ((int)$account->customer_id !== (int)$data['customer_id']) {
-            return ['success' => false, 'error' => 'You can only add your own accounts.'];
+            return ['success' => false, 'error' => 'This account does not belong to you. You can only add your own accounts.'];
+        }
+
+        // Check if account is locked
+        if ((int)$account->is_locked === 1) {
+            return ['success' => false, 'error' => 'This account is locked. Please contact the bank to unlock it before you can add it.'];
+        }
+
+        // Auto-activate account if it's inactive but not locked
+        if ((int)$account->is_active !== 1) {
+            $this->db->query("
+                UPDATE Accounts 
+                SET is_active = 1 
+                WHERE account_id = :account_id
+            ");
+            $this->db->bind(':account_id', $account->account_id);
+            $this->db->execute();
         }
 
         // Step 2: Verify account type matches user input
@@ -198,11 +214,17 @@ class Customer extends Database{
         $type = $this->db->single();
 
         if (!$type) {
-            return ['success' => false, 'error' => 'Invalid account type provided.'];
+            return ['success' => false, 'error' => 'Invalid account type selected. Please select a valid account type.'];
         }
 
         if ((int)$account->account_type_id !== (int)$type->account_type_id) {
-            return ['success' => false, 'error' => 'Account type does not match the account number.'];
+            // Get the actual account type name for better error message
+            $this->db->query("SELECT type_name FROM Account_Types WHERE account_type_id = :id");
+            $this->db->bind(':id', $account->account_type_id);
+            $actualType = $this->db->single();
+            $actualTypeName = $actualType ? $actualType->type_name : 'Unknown';
+            
+            return ['success' => false, 'error' => "Account type mismatch. This account is a '{$actualTypeName}', but you selected '{$data['account_type']}'. Please select the correct account type."];
         }
 
         $account_id = $account->account_id;
@@ -251,7 +273,7 @@ class Customer extends Database{
             return ['success' => true, 'message' => 'Account added successfully.'];
         }
 
-        return ['success' => false, 'error' => 'Failed to add account.'];
+        return ['success' => false, 'error' => 'Failed to add account to your dashboard. Please try again or contact support if the problem persists.'];
     }
 
     // -- CREATING ACCOUNT
@@ -1090,31 +1112,32 @@ class Customer extends Database{
         $this->db->bind(':message', $message);
         $this->db->execute();
 
-        // For the fee
-        $this->db->query("
-        INSERT INTO Transaction (
-            account_id,
-            transaction_type_id,
-            amount,
-            description
-        )
-        VALUES (
-            :sender,
-            :transaction_type,
-            :amount,
-            :message
-        );
-        ");
-        $this->db->bind(':sender', $sender);
-        $this->db->bind(':transaction_type', 5);
-        $this->db->bind(':amount', $fee);
-        $this->db->bind(':message', 'Transaction Service Charge - ' . $transaction_ref);
-        $this->db->execute();
+        // For the fee (only if fee is greater than 0)
+        if ($fee > 0) {
+            $this->db->query("
+            INSERT INTO Transaction (
+                account_id,
+                transaction_type_id,
+                amount,
+                description
+            )
+            VALUES (
+                :sender,
+                :transaction_type,
+                :amount,
+                :message
+            );
+            ");
+            $this->db->bind(':sender', $sender);
+            $this->db->bind(':transaction_type', 5);
+            $this->db->bind(':amount', $fee);
+            $this->db->bind(':message', 'Transaction Service Charge - ' . $transaction_ref);
+            $this->db->execute();
+        }
 
         // for the receiver
         $this->db->query("
         INSERT INTO Transaction (
-            transaction_ref,
             account_id,
             transaction_type_id,
             amount,
@@ -1122,7 +1145,6 @@ class Customer extends Database{
             description
         )
         VALUES (
-            :transaction_ref,
             :sender,
             :transaction_type,
             :amount,
@@ -1130,13 +1152,61 @@ class Customer extends Database{
             :message
         );
         ");
-        $this->db->bind(':transaction_ref', $transaction_ref);
         $this->db->bind(':sender', $receiver);
         $this->db->bind(':transaction_type', 9);
         $this->db->bind(':amount', $amount);
         $this->db->bind(':receiver', $sender);
         $this->db->bind(':message', $message);
         $this->db->execute();
+    }
+
+    public function recordDummyTransfer($transaction_ref, $sender, $amount, $fee, $message){
+        // for sender (debit only - no receiver credit for external transfer)
+        $this->db->query("
+        INSERT INTO Transaction (
+            transaction_ref,
+            account_id,
+            transaction_type_id,
+            amount,
+            description
+        )
+        VALUES (
+            :transaction_ref,
+            :sender,
+            :transaction_type,
+            :amount,
+            :message
+        );
+        ");
+        $this->db->bind(':transaction_ref', $transaction_ref);
+        $this->db->bind(':sender', $sender);
+        $this->db->bind(':transaction_type', 8);
+        $this->db->bind(':amount', $amount);
+        $this->db->bind(':message', $message);
+        $this->db->execute();
+
+        // For the fee (only if fee is greater than 0)
+        if ($fee > 0) {
+            $this->db->query("
+            INSERT INTO Transaction (
+                account_id,
+                transaction_type_id,
+                amount,
+                description
+            )
+            VALUES (
+                :sender,
+                :transaction_type,
+                :amount,
+                :message
+            );
+            ");
+            $this->db->bind(':sender', $sender);
+            $this->db->bind(':transaction_type', 5);
+            $this->db->bind(':amount', $fee);
+            $this->db->bind(':message', 'Transaction Service Charge - ' . $transaction_ref);
+            $this->db->execute();
+        }
     }
 
     public function getDropDownByCustomerId($customer_id) {
@@ -1945,21 +2015,20 @@ class Customer extends Database{
                 c.first_name,
                 c.last_name,
                 c.middle_name,
-                c.date_of_birth,
+                cp.date_of_birth,
                 e.email,
                 p.phone_number,
                 at.type_name as account_type,
                 cp.employment_status,
-                cp.employer_name,
-                cp.job_title,
-                cp.annual_income,
-                a.street_address,
-                a.house_number,
-                a.zip_code,
+                cp.company_name as employer_name,
+                cp.occupation as job_title,
+                cp.income_range as annual_income,
+                a.address_line as street_address,
+                a.postal_code as zip_code,
                 b.barangay_name as barangay,
                 ct.city_name as city,
                 pr.province_name as state,
-                ci.id_type,
+                idt.type_name as id_type,
                 ci.id_number
             FROM Account_Applications aa
             INNER JOIN Customers c ON aa.customer_id = c.customer_id
@@ -1971,13 +2040,124 @@ class Customer extends Database{
             LEFT JOIN Barangay b ON a.barangay_id = b.barangay_id
             LEFT JOIN City ct ON a.city_id = ct.city_id
             LEFT JOIN Province pr ON a.province_id = pr.province_id
-            LEFT JOIN Customer_IDs ci ON c.customer_id = ci.customer_id AND ci.id_type = 'government'
+            LEFT JOIN Customer_IDs ci ON c.customer_id = ci.customer_id
+            LEFT JOIN ID_Types idt ON ci.id_type_id = idt.id_type_id
             WHERE e.email = :email AND e.is_active = 1
             ORDER BY aa.submitted_at DESC
         ");
         
         $this->db->bind(':email', $email);
         return $this->db->resultSet();
+    }
+
+    /**
+     * Get all active account types
+     * @return array List of active account types
+     */
+    public function getActiveAccountTypes() {
+        $this->db->query("
+            SELECT 
+                account_type_id,
+                type_name,
+                description,
+                allows_passbook,
+                allows_atm_card,
+                requires_parent_guardian,
+                minimum_age,
+                base_interest_rate,
+                currency,
+                minimum_balance,
+                monthly_fee
+            FROM Account_Types 
+            WHERE is_active = 1
+            ORDER BY type_name ASC
+        ");
+        return $this->db->resultSet();
+    }
+
+    /**
+     * Submit a new account application
+     * @param array $data Application data
+     * @return array Result with success status
+     */
+    public function submitAccountApplication($data) {
+        try {
+            // Validate account type exists and get minimum balance
+            $this->db->query("
+                SELECT minimum_balance, type_name 
+                FROM Account_Types 
+                WHERE account_type_id = :account_type_id AND is_active = 1
+            ");
+            $this->db->bind(':account_type_id', $data['account_type_id']);
+            $accountType = $this->db->single();
+            
+            if (!$accountType) {
+                return ['success' => false, 'error' => 'Invalid account type selected'];
+            }
+            
+            // Generate application number
+            $this->db->query("SELECT COUNT(*) as count FROM Account_Applications");
+            $count = $this->db->single()->count;
+            $year = date('Y');
+            $applicationNumber = 'APP-' . $year . '-' . str_pad($count + 1, 5, '0', STR_PAD_LEFT);
+            
+            // Check for duplicate application number
+            $this->db->query("SELECT application_id FROM Account_Applications WHERE application_number = :app_num");
+            $this->db->bind(':app_num', $applicationNumber);
+            if ($this->db->single()) {
+                // If duplicate, add timestamp to make unique
+                $applicationNumber = 'APP-' . $year . '-' . str_pad($count + 1, 5, '0', STR_PAD_LEFT) . '-' . time();
+            }
+            
+            // Insert application
+            $this->db->query("
+                INSERT INTO Account_Applications (
+                    application_number,
+                    customer_id,
+                    account_type_id,
+                    initial_deposit,
+                    wants_passbook,
+                    wants_atm_card,
+                    terms_accepted_at,
+                    privacy_accepted_at,
+                    application_status,
+                    submitted_at
+                ) VALUES (
+                    :application_number,
+                    :customer_id,
+                    :account_type_id,
+                    :initial_deposit,
+                    :wants_passbook,
+                    :wants_atm_card,
+                    :terms_accepted_at,
+                    :privacy_accepted_at,
+                    'Pending',
+                    NOW()
+                )
+            ");
+            
+            $this->db->bind(':application_number', $applicationNumber);
+            $this->db->bind(':customer_id', $data['customer_id']);
+            $this->db->bind(':account_type_id', $data['account_type_id']);
+            $this->db->bind(':initial_deposit', $data['initial_deposit']);
+            $this->db->bind(':wants_passbook', $data['wants_passbook']);
+            $this->db->bind(':wants_atm_card', $data['wants_atm_card']);
+            $this->db->bind(':terms_accepted_at', $data['terms_accepted_at']);
+            $this->db->bind(':privacy_accepted_at', $data['privacy_accepted_at']);
+            
+            if ($this->db->execute()) {
+                return [
+                    'success' => true,
+                    'application_number' => $applicationNumber,
+                    'message' => 'Application submitted successfully'
+                ];
+            } else {
+                return ['success' => false, 'error' => 'Failed to submit application'];
+            }
+            
+        } catch (Exception $e) {
+            return ['success' => false, 'error' => 'Error: ' . $e->getMessage()];
+        }
     }
 
     /**

@@ -135,6 +135,7 @@
             $firstAccount = $data['accounts'][0] ?? null;
             ?>
 
+
                           <?php
               $firstAccountCardRendered = false; // Flag to mark the first card
               foreach ($groupedAccounts as $groupName => $accountsInGroup): ?>
@@ -284,6 +285,13 @@
                                 <i class="bi bi-chevron-right fs-5 text-dark"></i>
                             </button>
 
+                            <?php if (empty($groupedAccounts)): ?>
+                                <div class="bg-white rounded-4 px-4 py-5 text-center shadow-sm">
+                                    <i class="bi bi-inbox text-muted" style="font-size: 3rem;"></i>
+                                    <p class="text-muted mt-3 mb-0">No accounts linked yet.<br><small>Click "Add Account" above to link your existing bank accounts.</small></p>
+                                </div>
+                            <?php endif; ?>
+
                             <?php foreach ($groupedAccounts as $groupName => $accountsInGroup): ?>
                                 <?php if (!empty($accountsInGroup)): ?>
                                     <div class="bg-white rounded-4 px-3 py-2 mb-3 shadow-sm ">
@@ -343,6 +351,13 @@
 
                         <!-- BODY ------------------------------------------------------------------------------------------>
                         <div class="modal-body rounded-bottom-3" style="background-color: #D9D9D9;">
+
+                            <?php if (empty($groupedAccounts)): ?>
+                                <div class="bg-white rounded-4 px-4 py-5 text-center shadow-sm">
+                                    <i class="bi bi-inbox text-muted" style="font-size: 3rem;"></i>
+                                    <p class="text-muted mt-3 mb-0">No accounts to show or hide.<br><small>Add accounts first to manage their visibility.</small></p>
+                                </div>
+                            <?php endif; ?>
 
                             <?php foreach ($groupedAccounts as $groupName => $accountsInGroup): ?>
                                 <?php if (!empty($accountsInGroup)): ?>
@@ -414,42 +429,47 @@
                             <?php endif; ?>
 
                             <form id="addAccountForm" action=<?= URLROOT . "/customer/addAccount"?> method="POST">
-                                <div class="mb-3 bg-light rounded-4 p-3 shadow-sm">
-                                    <label for="accountType" class="form-label fw-semibold text-dark mb-1 ms-2">Account Type</label>
-                                    <select class="form-select border-1 border-secondary rounded-3 bg-body-secondary" id="accountType" name="account_type" required>
+                                <div class="mb-3">
+                                    <label for="accountType" class="form-label fw-semibold text-dark mb-2">Account Type *</label>
+                                    <select class="form-select border-2 rounded-3 py-2" id="accountType" name="account_type" required style="border-color: #198754;">
                                         <option value="">Select Account Type</option>
-                                        <option value="Savings Account">Savings Account</option>
-                                        <option value="Checking Account">Checking Account</option>
-                                        <option value="Time Deposit">Time Deposit</option>
-                                        <option value="Current Account">Current Account</option>
-                                        <option value="USD Account">USD Account</option>
+                                        <?php if (!empty($data['account_types'])): ?>
+                                            <?php foreach ($data['account_types'] as $type): ?>
+                                                <option value="<?= htmlspecialchars($type->type_name); ?>">
+                                                    <?= htmlspecialchars($type->type_name); ?>
+                                                </option>
+                                            <?php endforeach; ?>
+                                        <?php endif; ?>
                                     </select>
                                 </div>
 
                                 <!-- ACCOUNT NUMBER ------------------------------------------------------------------------------------------>
-                                <div class="mb-3 bg-light rounded-4 p-3 shadow-sm">
-                                    <label for="accountNumber" class="form-label fw-semibold text-dark mb-2 ms-2">Account Number</label>
-                                    <input type="text" class="form-control border-1 border-secondary rounded-3 mb-4 py-2" id="accountNumber" name="account_number" placeholder="Enter account number" required>
-
-                                    <!-- PREFERRED NAME ------------------------------------------------------------------------------------------>
-                                    <label for="preferredName" class="form-label fw-semibold text-dark mb-2 ms-2">Preferred Name
-                                        <span class="text-muted fw-normal fst-italic">(Optional)</span>
-                                    </label>
-                                    <input type="text" class="form-control border-1 border-secondary rounded-3 py-2" id="preferredName" name="account_name" placeholder="Enter name">
+                                <div class="mb-4">
+                                    <label for="accountNumber" class="form-label fw-semibold text-dark mb-2">Account Number *</label>
+                                    <input type="text" 
+                                           class="form-control border-2 rounded-3 py-2" 
+                                           id="accountNumber" 
+                                           name="account_number" 
+                                           placeholder="Enter your account number" 
+                                           required
+                                           style="border-color: #198754;">
+                                    <small class="text-muted">Enter the account number provided by the bank</small>
                                 </div>
 
                                 <!-- TERMS AND CONDITIONS ------------------------------------------------------------------------------------------>
-                                <div class="text-center mb-3">
-                                    <input class="form-check-input me-2" type="checkbox" id="termsCheck" required>
-                                    <label class="form-check-label small" for="termsCheck">
-                                        I accept the <a href="#" class="text-decoration-none text-success">Terms and Agreements</a>
-                                    </label>
+                                <div class="mb-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="termsCheck" required style="border-color: #198754;">
+                                        <label class="form-check-label" for="termsCheck">
+                                            I confirm that this account belongs to me and I accept the <a href="#" class="text-success text-decoration-none">Terms and Conditions</a>
+                                        </label>
+                                    </div>
                                 </div>
 
                                 <!-- ADD BUTTON ------------------------------------------------------------------------------------------>
-                                <div class="text-center">
-                                    <button type="submit" class="btn w-75 text-white fw-bold fs-5 py-2 rounded-3" style="background-color:#003631;">
-                                        Add
+                                <div class="d-grid gap-2">
+                                    <button type="submit" class="btn btn-success btn-lg fw-semibold py-2 rounded-3">
+                                        <i class="bi bi-plus-circle me-2"></i>Add Account
                                     </button>
                                 </div>
                             </form>
@@ -486,14 +506,57 @@
         </div>
 
         <!----------------------- MAIN CONTENT ------------------------------------------------------------------------------------->
-        <div class="col-md-7 col-lg-8 pt-5 shadow-sm" id="main-account-content" style="height: 100%; overflow-y: auto;">
+        <div class="col-md-7 col-lg-8 pt-5 shadow-sm" id="main-account-content" style="height: 100%; <?= empty($data['accounts']) ? 'overflow-y: auto;' : 'overflow-y: hidden;' ?>">
             <div class="d-flex justify-content-between align-items-center">
                 <h4 class="fw-bold mb-0 px-4"> <?= htmlspecialchars($data['user_name'] ?? ($data['first_name'] . ' ' . $data['last_name']) ?? 'Customer'); ?></h4>
             </div>
 
             <hr>
-
-            <!------------------- ACCOUNT DETAILS ---------------------------------------------------------------------------------->
+            <?php if (empty($data['accounts'])): ?>
+                <!-- No Accounts Empty State -->
+                <div class="text-center py-2 px-4">
+                    <div class="mb-2">
+                        <i class="bi bi-bank" style="font-size: 3.5rem; color: #198754;"></i>
+                    </div>
+                    <h5 class="fw-bold mb-2">Welcome to Your Banking Dashboard</h5>
+                    <p class="text-muted mb-3">You haven't opened any accounts yet.<br>Let's get started by applying for your first account.</p>
+                    <a href="<?= URLROOT; ?>/customer/account_application" class="btn btn-success px-4 py-2 rounded-3">
+                        <i class="bi bi-plus-circle me-2"></i>Apply for Account
+                    </a>
+                    
+                    <div class="mt-3">
+                        <div class="row text-start">
+                            <div class="col-md-4 mb-2">
+                                <div class="card border-0 shadow-sm h-100">
+                                    <div class="card-body py-2 px-3">
+                                        <i class="bi bi-shield-check text-success fs-3 mb-2"></i>
+                                        <h6 class="fw-bold mb-1" style="font-size: 0.9rem;">Secure Banking</h6>
+                                        <p class="text-muted mb-0" style="font-size: 0.75rem;">Your money is protected with industry-leading security measures.</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4 mb-2">
+                                <div class="card border-0 shadow-sm h-100">
+                                    <div class="card-body py-2 px-3">
+                                        <i class="bi bi-clock-history text-success fs-3 mb-2"></i>
+                                        <h6 class="fw-bold mb-1" style="font-size: 0.9rem;">24/7 Access</h6>
+                                        <p class="text-muted mb-0" style="font-size: 0.75rem;">Manage your accounts anytime, anywhere with online banking.</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4 mb-2">
+                                <div class="card border-0 shadow-sm h-100">
+                                    <div class="card-body py-2 px-3">
+                                        <i class="bi bi-percent text-success fs-3 mb-2"></i>
+                                        <h6 class="fw-bold mb-1" style="font-size: 0.9rem;">Competitive Rates</h6>
+                                        <p class="text-muted mb-0" style="font-size: 0.75rem;">Enjoy competitive interest rates on savings and time deposits.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            <?php else: ?>            <!------------------- ACCOUNT DETAILS ---------------------------------------------------------------------------------->
             <div class="card border-0 shadow-sm mb-4 px-4" id="account-details-card">
                 <div class="card-body">
                     <h6 class="fw-bold mb-3">Account Details</h6>
@@ -597,6 +660,7 @@
                     </div>
                 </div>
             </div>
+            <?php endif; ?>
         </div>
     </div>
 </div>

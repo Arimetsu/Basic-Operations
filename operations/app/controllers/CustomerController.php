@@ -47,12 +47,14 @@ class CustomerController extends Controller {
     public function account(){
 
         $accounts = $this->customerModel->getAccountsByCustomerId($_SESSION['customer_id']);
+        $accountTypes = $this->customerModel->getActiveAccountTypes();
 
         $data = [
             'title' => "Accounts",
             'first_name' => $_SESSION['customer_first_name'],
             'last_name'  => $_SESSION['customer_last_name'],
-            'accounts' => $accounts
+            'accounts' => $accounts,
+            'account_types' => $accountTypes
         ];
         $this->view('customer/account', $data);
     }
@@ -240,12 +242,14 @@ class CustomerController extends Controller {
             }
 
             $accounts = $this->customerModel->getAccountsByCustomerId($_SESSION['customer_id']);
+            $accountTypes = $this->customerModel->getActiveAccountTypes();
 
             $data = array_merge($data, [
                 'title' => "Accounts",
                 'first_name' => $_SESSION['customer_first_name'],
                 'last_name'  => $_SESSION['customer_last_name'],
                 'accounts' => $accounts,
+                'account_types' => $accountTypes,
                 'show_add_account_modal' => true  // Flag to auto-show the modal
             ]);
 
@@ -253,6 +257,7 @@ class CustomerController extends Controller {
 
         } else {
             $accounts = $this->customerModel->getAccountsByCustomerId($_SESSION['customer_id']);
+            $accountTypes = $this->customerModel->getActiveAccountTypes();
 
             $data = [
                 'title' => "Accounts",
@@ -264,6 +269,7 @@ class CustomerController extends Controller {
                 'account_type_error'   => '',
                 'success_message'      => '',
                 'accounts' => $accounts,
+                'account_types' => $accountTypes,
                 'show_add_account_modal' => false
             ];
 
@@ -578,14 +584,31 @@ class CustomerController extends Controller {
             // Initialize based on transfer type
             if ($transfer_type === 'own_account') {
                 $to_account = trim($_POST['to_account'] ?? '');
-                $recipient_number = $to_account; // For own account, recipient is the to_account
-                $recipient_name = ''; // Not needed for own account
-                $message = ''; // No message for own account transfers
+                $recipient_number = $to_account;
+                $recipient_name = '';
+                $message = '';
+                $bank_name = '';
+                $bank_account_number = '';
+                $bank_account_name = '';
+                $bank_code = '';
+            } elseif ($transfer_type === 'other_bank') {
+                $to_account = '';
+                $recipient_number = '';
+                $recipient_name = '';
+                $message = '';
+                $bank_name = trim($_POST['bank_name'] ?? '');
+                $bank_account_number = trim($_POST['bank_account_number'] ?? '');
+                $bank_account_name = trim($_POST['bank_account_name'] ?? '');
+                $bank_code = trim($_POST['bank_code'] ?? '');
             } else {
                 $to_account = '';
                 $recipient_number = trim($_POST['recipient_number'] ?? '');
                 $recipient_name = trim($_POST['recipient_name'] ?? '');
                 $message = trim($_POST['message'] ?? '');
+                $bank_name = '';
+                $bank_account_number = '';
+                $bank_account_name = '';
+                $bank_code = '';
             }
 
             $data = [
@@ -597,6 +620,10 @@ class CustomerController extends Controller {
                 'recipient_name' => $recipient_name,
                 'amount' => $amount,
                 'message' => $message,
+                'bank_name' => $bank_name,
+                'bank_account_number' => $bank_account_number,
+                'bank_account_name' => $bank_account_name,
+                'bank_code' => $bank_code,
                 'from_account_error' => '',
                 'to_account_error' => '',
                 'recipient_number_error' => '',
@@ -604,6 +631,10 @@ class CustomerController extends Controller {
                 'amount_error' => '',
                 'message_error' => '',
                 'other_error' => '',
+                'bank_name_error' => '',
+                'bank_account_number_error' => '',
+                'bank_account_name_error' => '',
+                'bank_code_error' => '',
             ];
 
             if (empty($from_account)){
@@ -616,8 +647,15 @@ class CustomerController extends Controller {
                 $data['from_account_error'] = 'Please select your own account number.';
             }
 
+            // Additional validation to ensure only Savings/Checking can send for other_bank
+            if ($transfer_type === 'other_bank' && $sender) {
+                if (!in_array((int)$sender->account_type_id, [1, 2])) {
+                    $data['from_account_error'] = 'Only Savings and Checking accounts can transfer to other banks.';
+                }
+            }
+
             // Validation based on transfer type
-            if ($transfer_type === 'own_account') {
+           if ($transfer_type === 'own_account') {
                 // Own account transfer validation
                 if(empty($to_account)){
                     $data['to_account_error'] = 'Please select destination account.';
@@ -645,8 +683,23 @@ class CustomerController extends Controller {
                 } else {
                     $data['to_account_error'] = 'Destination account not found.';
                 }
+            } elseif ($transfer_type === 'other_bank') {
+                // Other bank transfer validation
+                if(empty($bank_name)){
+                    $data['bank_name_error'] = 'Please enter the bank name.';
+                }
+                
+                if(empty($bank_account_number)){
+                    $data['bank_account_number_error'] = 'Please enter the account number.';
+                }
+                
+                if(empty($bank_account_name)){
+                    $data['bank_account_name_error'] = 'Please enter the account holder name.';
+                }
+                
+                // Bank code is optional, no error if empty
             } else {
-                // Another account transfer validation
+                // Another Evergreen account transfer validation
                 if(empty($recipient_number)){
                     $data['recipient_number_error'] = 'Please enter recipient account number.';
                 }
@@ -676,8 +729,14 @@ class CustomerController extends Controller {
             }
             $amount_validation = $this->customerModel->validateAmount($data['from_account']);
             
-            // Fee only applies to another_account transfers
-            $fee = ($transfer_type === 'own_account') ? 0.00 : 15.00;
+            // Fee based on transfer type
+            if ($transfer_type === 'own_account') {
+                $fee = 0.00;
+            } elseif ($transfer_type === 'other_bank') {
+                $fee = 25.00;
+            } else {
+                $fee = 15.00;
+            }
             $total = $data['amount'] + $fee;
 
             if((float)$amount_validation->balance < $total){
@@ -700,7 +759,7 @@ class CustomerController extends Controller {
                 $data['message_error'] = 'Please enter 100 characters only';
             }
 
-            if(empty($data['from_account_error']) && empty($data['to_account_error']) && empty($data['recipient_number_error']) && empty($data['recipient_name_error']) && empty($data['amount_error']) && empty($data['message_error']) && empty($data['other_error'])){
+            if(empty($data['from_account_error']) && empty($data['to_account_error']) && empty($data['recipient_number_error']) && empty($data['recipient_name_error']) && empty($data['amount_error']) && empty($data['message_error']) && empty($data['other_error']) && empty($data['bank_name_error']) && empty($data['bank_account_number_error']) && empty($data['bank_account_name_error'])){
                 $temp_transaction_ref = 'TXN-PREVIEW-' . date('YmdHis') . '-' . strtoupper(bin2hex(random_bytes(3)));
                 $remaining_balance = (float)$amount_validation->balance - $total;
                 $sender_name = $_SESSION['customer_first_name'] . ' ' . $_SESSION['customer_last_name'] ?? 'Sender Name Unknown';
@@ -757,11 +816,28 @@ class CustomerController extends Controller {
                 $recipient_number = $to_account;
                 $recipient_name = '';
                 $message = '';
+                $bank_name = '';
+                $bank_account_number = '';
+                $bank_account_name = '';
+                $bank_code = '';
+            } elseif ($transfer_type === 'other_bank') {
+                $to_account = '';
+                $recipient_number = '';
+                $recipient_name = '';
+                $message = trim($_POST['message'] ?? '');
+                $bank_name = trim($_POST['bank_name'] ?? '');
+                $bank_account_number = trim($_POST['bank_account_number'] ?? '');
+                $bank_account_name = trim($_POST['bank_account_name'] ?? '');
+                $bank_code = trim($_POST['bank_code'] ?? '');
             } else {
                 $to_account = '';
                 $recipient_number = trim($_POST['recipient_number'] ?? '');
                 $recipient_name = trim($_POST['recipient_name'] ?? '');
                 $message = trim($_POST['message'] ?? '');
+                $bank_name = '';
+                $bank_account_number = '';
+                $bank_account_name = '';
+                $bank_code = '';
             }
 
             $data = [
@@ -773,6 +849,10 @@ class CustomerController extends Controller {
                 'recipient_name' => $recipient_name,
                 'amount' => $amount,
                 'message' => $message,
+                'bank_name' => $bank_name ?? '',
+                'bank_account_number' => $bank_account_number ?? '',
+                'bank_account_name' => $bank_account_name ?? '',
+                'bank_code' => $bank_code ?? '',
                 'from_account_error' => '',
                 'to_account_error' => '',
                 'recipient_number_error' => '',
@@ -806,6 +886,18 @@ class CustomerController extends Controller {
                 if (!$receiver) {
                     $data['to_account_error'] = 'Destination account not found.';
                 }
+            } elseif ($transfer_type === 'other_bank') {
+                if(empty($bank_name)){
+                    $data['other_error'] = 'Please enter bank name.';
+                }
+                if(empty($bank_account_number)){
+                    $data['other_error'] = 'Please enter bank account number.';
+                }
+                if(empty($bank_account_name)){
+                    $data['other_error'] = 'Please enter account holder name.';
+                }
+                // For other_bank, receiver is null (dummy transfer)
+                $receiver = null;
             } else {
                 if(empty($recipient_number)){
                     $data['recipient_number_error'] = 'Please enter recipient account number.';
@@ -836,22 +928,33 @@ class CustomerController extends Controller {
             }
             $amount_validation = $this->customerModel->validateAmount($data['from_account']);
             
-            // Fee only for another_account transfers
-            $fee = ($transfer_type === 'own_account') ? 0.00 : 15.00;
+            // Fee based on transfer type
+            if ($transfer_type === 'own_account') {
+                $fee = 0.00;
+            } elseif ($transfer_type === 'other_bank') {
+                $fee = 25.00;
+            } else {
+                $fee = 15.00;
+            }
             $total = $data['amount'] + $fee;
 
             if((float)$amount_validation->balance < $total){
                 $data['amount_error'] = 'Insufficient Funds';
             }
 
-            // Message validation only for another_account transfers
-            if ($transfer_type === 'another_account' && strlen($message) >= 100){
+            // Message validation
+            if (in_array($transfer_type, ['another_account', 'other_bank']) && strlen($message) >= 100){
                 $data['message_error'] = 'Please enter 100 characters only';
             }
             
             // Build transaction message
             if ($transfer_type === 'own_account') {
                 $message = 'Transfer to own account ' . $to_account;
+            } elseif ($transfer_type === 'other_bank') {
+                $message = 'Transfer to ' . $bank_name . ' - ' . $bank_account_name . ' (' . $bank_account_number . ')';
+                if (!empty($data['message'])) {
+                    $message .= ' - ' . $data['message'];
+                }
             } else {
                 $message = 'Sent to ' . $data['recipient_name'] . ' (' . $data['recipient_number'] . ')';
                 if (!empty($data['message'])) {
@@ -862,7 +965,14 @@ class CustomerController extends Controller {
             if(empty($data['from_account_error']) && empty($data['to_account_error']) && empty($data['recipient_number_error']) && empty($data['recipient_name_error']) && empty($data['amount_error']) && empty($data['message_error']) && empty($data['other_error'])){
                 $transaction_ref = 'TXN-' . date('YmdHis') . '-' . strtoupper(bin2hex(random_bytes(3)));
 
-                $result = $this->customerModel->recordTransaction($transaction_ref, $sender->account_id, $receiver->account_id, $data['amount'], $fee, $message);
+                // For other_bank, receiver is null (just deduct from sender)
+                $receiver_id = ($transfer_type === 'other_bank') ? null : $receiver->account_id;
+                if ($transfer_type === 'other_bank') {
+                    // Dummy transfer - only record debit from sender
+                    $this->customerModel->recordDummyTransfer($transaction_ref, $sender->account_id, $data['amount'], $fee, $message);
+                } else {
+                    $result = $this->customerModel->recordTransaction($transaction_ref, $sender->account_id, $receiver->account_id, $data['amount'], $fee, $message);
+                }
 
                 header('Location: ' . URLROOT . '/customer/dashboard');
                 exit();
@@ -1350,6 +1460,116 @@ class CustomerController extends Controller {
     }
 
     /**
+     * Show Account Application Form
+     * Access via: /customer/account_application
+     */
+    public function account_application() {
+        // Check if logged in
+        if (!isset($_SESSION['customer_id'])) {
+            header('Location: ' . URLROOT . '/auth/login');
+            exit;
+        }
+
+        // Get customer data
+        $customer_id = $_SESSION['customer_id'];
+        $profile = $this->customerModel->getCustomerProfileData($customer_id);
+        
+        // Get primary email and phone
+        $emails = $this->customerModel->getCustomerEmails($customer_id);
+        $phones = $this->customerModel->getCustomerPhones($customer_id);
+        
+        $primaryEmail = '';
+        $primaryPhone = '';
+        
+        foreach ($emails as $email) {
+            if ($email->is_primary == 1) {
+                $primaryEmail = $email->email;
+                break;
+            }
+        }
+        
+        foreach ($phones as $phone) {
+            if ($phone->is_primary == 1) {
+                $primaryPhone = $phone->phone_number;
+                break;
+            }
+        }
+        
+        // Get available account types
+        $account_types = $this->customerModel->getActiveAccountTypes();
+        
+        $data = [
+            'title' => 'Apply for New Account',
+            'full_name' => trim($profile->first_name . ' ' . $profile->middle_name . ' ' . $profile->last_name),
+            'email' => $primaryEmail,
+            'phone' => $primaryPhone,
+            'account_types' => $account_types,
+            'error' => $_SESSION['application_error'] ?? '',
+            'success' => $_SESSION['application_success'] ?? ''
+        ];
+        
+        unset($_SESSION['application_error']);
+        unset($_SESSION['application_success']);
+        
+        $this->view('customer/account_application', $data);
+    }
+
+    /**
+     * Submit Account Application
+     * Access via: POST /customer/submitAccountApplication
+     */
+    public function submitAccountApplication() {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            header('Location: ' . URLROOT . '/customer/account_application');
+            exit;
+        }
+
+        // Check if logged in
+        if (!isset($_SESSION['customer_id'])) {
+            header('Location: ' . URLROOT . '/auth/login');
+            exit;
+        }
+
+        $customer_id = $_SESSION['customer_id'];
+        
+        // Validate input
+        if (empty($_POST['account_type_id'])) {
+            $_SESSION['application_error'] = 'Please select an account type';
+            header('Location: ' . URLROOT . '/customer/account_application');
+            exit;
+        }
+        
+        if (empty($_POST['accept_terms'])) {
+            $_SESSION['application_error'] = 'You must accept the terms and conditions';
+            header('Location: ' . URLROOT . '/customer/account_application');
+            exit;
+        }
+        
+        // Prepare application data
+        $applicationData = [
+            'customer_id' => $customer_id,
+            'account_type_id' => intval($_POST['account_type_id']),
+            'initial_deposit' => 0.00, // Will be deposited at physical branch
+            'wants_passbook' => isset($_POST['wants_passbook']) ? 1 : 0,
+            'wants_atm_card' => isset($_POST['wants_atm_card']) ? 1 : 0,
+            'terms_accepted_at' => date('Y-m-d H:i:s'),
+            'privacy_accepted_at' => date('Y-m-d H:i:s')
+        ];
+        
+        // Submit application
+        $result = $this->customerModel->submitAccountApplication($applicationData);
+        
+        if ($result['success']) {
+            $_SESSION['application_success'] = 'Application submitted successfully! Application Number: ' . $result['application_number'];
+            header('Location: ' . URLROOT . '/customer/account_applications');
+        } else {
+            $_SESSION['application_error'] = $result['error'] ?? 'Failed to submit application. Please try again.';
+            header('Location: ' . URLROOT . '/customer/account_application');
+        }
+        exit;
+    }
+
+    /**
      * View Account Applications Status
      * Shows all account applications for the logged-in customer
      * Access via: /customer/account_applications
@@ -1388,8 +1608,8 @@ class CustomerController extends Controller {
             $reviewedAt = $app->reviewed_at ? date('M d, Y h:i A', strtotime($app->reviewed_at)) : null;
             $dateOfBirth = $app->date_of_birth ? date('M d, Y', strtotime($app->date_of_birth)) : 'N/A';
             
-            // Format annual income
-            $annualIncome = $app->annual_income ? '₱' . number_format($app->annual_income, 2) : 'N/A';
+            // Format annual income (it's a range string like "250,000 - 500,000")
+            $annualIncome = $app->annual_income ? '₱' . $app->annual_income : 'N/A';
             
             // Status badge class
             $statusClass = 'warning';
