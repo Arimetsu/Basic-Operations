@@ -1,0 +1,272 @@
+-- ==========================================
+-- CORE TABLES
+-- ==========================================
+
+CREATE TABLE Customers (
+    customer_id        INT PRIMARY KEY,
+    last_name          VARCHAR(100),
+    first_name         VARCHAR(100),
+    middle_name        VARCHAR(100),
+    password_hash      VARCHAR(255),
+    is_active          BOOLEAN DEFAULT TRUE, -- For Archiving
+    created_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE Phones (
+    phone_id           INT PRIMARY KEY,
+    customer_id        INT,
+    phone_number       VARCHAR(50),
+    phone_type         VARCHAR(50),
+    is_primary         BOOLEAN,
+    is_active          BOOLEAN DEFAULT TRUE, -- For Archiving
+    created_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (customer_id) REFERENCES Customers(customer_id)
+);
+
+CREATE TABLE Emails (
+    email_id           INT PRIMARY KEY,
+    customer_id        INT,
+    email              VARCHAR(255),
+    is_primary         BOOLEAN,
+    is_active          BOOLEAN DEFAULT TRUE, -- For Archiving
+    created_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (customer_id) REFERENCES Customers(customer_id)
+);
+
+CREATE TABLE Gender (
+    gender_id           INT PRIMARY KEY,
+    gender_name         VARCHAR(50)
+);
+
+-- ==========================================
+-- IDENTITY & DOCUMENTS TABLES
+-- ==========================================
+
+-- Lookup table for ID types (Passport, National ID, Driver's License, etc.)
+CREATE TABLE ID_Types (
+    id_type_id       INT PRIMARY KEY,
+    type_name        VARCHAR(100) NOT NULL,
+    description      VARCHAR(255)
+);
+
+-- Table to store customer's specific ID numbers (allows multiple IDs per customer)
+CREATE TABLE Customer_IDs (
+    customer_id      INT,
+    id_type_id       INT,
+    id_number        VARCHAR(150) NOT NULL,
+    issue_date       DATE,
+    expiration_date  DATE,
+    is_verified      BOOLEAN DEFAULT FALSE,
+    created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (customer_id, id_type_id),
+    FOREIGN KEY (customer_id) REFERENCES Customers(customer_id),
+    FOREIGN KEY (id_type_id) REFERENCES ID_Types(id_type_id)
+);
+
+-- Lookup table for document types (Profile Picture, E-Signature, ID Photo)
+CREATE TABLE Document_Types (
+    doc_type_id      INT PRIMARY KEY,
+    type_name        VARCHAR(100),
+    description      VARCHAR(255)
+);
+
+-- Table to store file paths for photos and signatures
+CREATE TABLE Customer_Documents (
+    document_id      INT PRIMARY KEY,
+    customer_id      INT NOT NULL,
+    doc_type_id      INT,
+    file_path        VARCHAR(500),
+    uploaded_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    is_active        BOOLEAN DEFAULT TRUE,
+    FOREIGN KEY (customer_id) REFERENCES Customers(customer_id),
+    FOREIGN KEY (doc_type_id) REFERENCES Document_Types(doc_type_id)
+);
+
+-- ==========================================
+-- PROFILE TABLES
+-- ==========================================
+
+CREATE TABLE Customer_Profile (
+    profile_id          INT PRIMARY KEY,
+    customer_id         INT,
+    gender_id           INT,
+    date_of_birth       DATE,
+    marital_status      VARCHAR(100),
+    nationality         VARCHAR(100),
+    employment_status   VARCHAR(50),
+    company_name        VARCHAR(150),
+    occupation          VARCHAR(150),
+    income_range        VARCHAR(100),
+    is_active           BOOLEAN DEFAULT TRUE, -- For Archiving
+    created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (customer_id) REFERENCES Customers(customer_id),
+    FOREIGN KEY (gender_id) REFERENCES Gender(gender_id)
+);
+
+-- ==========================================
+-- LOCATION TABLES
+-- ==========================================
+
+CREATE TABLE Province (
+    province_id        INT PRIMARY KEY,
+    province_name      VARCHAR(150),
+    country            VARCHAR(150),
+    region             VARCHAR(150)
+);
+
+CREATE TABLE City (
+    city_id            INT PRIMARY KEY,
+    city_name          VARCHAR(150),
+    province_id        INT,
+    FOREIGN KEY (province_id) REFERENCES Province(province_id)
+);
+
+CREATE TABLE Barangay (
+    barangay_id        INT PRIMARY KEY,
+    barangay_name      VARCHAR(150),
+    city_id            INT,
+    FOREIGN KEY (city_id) REFERENCES City(city_id)
+);
+
+CREATE TABLE Addresses (
+    address_id         INT PRIMARY KEY,
+    customer_id        INT,
+    address_line       VARCHAR(255),
+    barangay_id        INT,
+    city_id            INT,
+    province_id        INT,
+    postal_code       VARCHAR(50),
+    is_primary         BOOLEAN,
+    is_active          BOOLEAN DEFAULT TRUE, -- For Archiving
+    created_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (customer_id) REFERENCES Customers(customer_id),
+    FOREIGN KEY (barangay_id) REFERENCES Barangay(barangay_id),
+    FOREIGN KEY (city_id) REFERENCES City(city_id),
+    FOREIGN KEY (province_id) REFERENCES Province(province_id)
+);
+
+-- ==========================================
+-- ACCOUNT TABLES
+-- ==========================================
+
+CREATE TABLE Account_Types (
+    account_type_id    INT PRIMARY KEY,
+    type_name          VARCHAR(100),
+    description        TEXT,
+    allows_passbook    BOOLEAN DEFAULT FALSE,    -- Can have a passbook?
+    allows_atm_card    BOOLEAN DEFAULT FALSE,   -- Can have an ATM card?
+    requires_parent_guardian BOOLEAN DEFAULT FALSE, -- Is this a Junior/Student account?
+    minimum_age        INT
+);
+
+CREATE TABLE Accounts (
+    account_id         INT PRIMARY KEY,
+    customer_id        INT,
+    account_type_id    INT,
+    account_number     VARCHAR(100),
+    interest_rate      DECIMAL(10,4),
+    last_interest_date DATE,
+    is_locked          BOOLEAN,
+    is_active          BOOLEAN DEFAULT TRUE,    -- For Archiving
+    archived_at        TIMESTAMP NULL,          -- Date when account was closed/archived
+    parent_account_id  INT,                     -- For Mother/Junior accounts
+    created_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (customer_id) REFERENCES Customers(customer_id),
+    FOREIGN KEY (account_type_id) REFERENCES Account_Types(account_type_id),
+    FOREIGN KEY (parent_account_id) REFERENCES Accounts(account_id)
+);
+
+-- Table to store closed account history (for audit trails)
+CREATE TABLE Account_History (
+    history_id       INT PRIMARY KEY,
+    account_id       INT NOT NULL,
+    customer_id      INT,
+    closed_date      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    closure_reason   VARCHAR(255),
+    final_balance    DECIMAL(18,2),
+    FOREIGN KEY (account_id) REFERENCES Accounts(account_id)
+);
+
+-- ==========================================
+-- TRANSACTION TABLES
+-- ==========================================
+
+CREATE TABLE Transaction_Type (
+    transaction_type_id INT PRIMARY KEY,
+    type_name           VARCHAR(150),
+    description         TEXT
+);
+
+CREATE TABLE Transaction (
+    transaction_id      INT PRIMARY KEY,
+    transaction_ref     VARCHAR(150),
+    account_id          INT,
+    transaction_type_id INT,
+    related_account_id  INT,
+    amount              DECIMAL(18,2),
+    description         TEXT,
+    created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (account_id) REFERENCES Accounts(account_id),
+    FOREIGN KEY (transaction_type_id) REFERENCES Transaction_Type(transaction_type_id),
+    FOREIGN KEY (related_account_id) REFERENCES Accounts(account_id)
+);
+
+CREATE TABLE Account_Applications (
+    application_id           INT PRIMARY KEY,
+    application_number       VARCHAR(50) UNIQUE NOT NULL,
+    customer_id              INT NOT NULL,
+    
+    -- Application Details
+    account_type_id          INT NOT NULL,
+    application_status       ENUM('Pending', 'Under_Review', 'Approved', 'Rejected', 'Cancelled') DEFAULT 'Pending',
+    
+    -- Product Preferences
+    initial_deposit          DECIMAL(18,2),
+    wants_passbook           BOOLEAN DEFAULT FALSE,
+    wants_atm_card           BOOLEAN DEFAULT DEFAULT FALSE,
+    
+    -- Consent (Proof of agreement)
+    terms_accepted_at       TIMESTAMP,
+    privacy_accepted_at     TIMESTAMP,
+    
+    -- Submission & Review
+    submitted_via           ENUM('Online', 'Branch', 'Mobile') DEFAULT 'Online',
+    submitted_at            TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    reviewed_by_employee_id INT,
+    reviewed_at             TIMESTAMP,
+    rejection_reason        TEXT,
+    
+    created_at              TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    FOREIGN KEY (customer_id) REFERENCES Customers(customer_id),
+    FOREIGN KEY (account_type_id) REFERENCES Account_Types(account_type_id)
+);
+-- ==========================================
+-- SEED DATA (EXAMPLES)
+-- ==========================================
+
+-- Insert ID Types
+INSERT INTO ID_Types (id_type_id, type_name, description) VALUES 
+(1, 'National ID', 'Government issued national identification'),
+(2, 'Passport', 'International travel document'),
+(3, 'Driver License', 'Driving permit issued by government');
+
+-- Insert Document Types
+INSERT INTO Document_Types (doc_type_id, type_name, description) VALUES 
+(1, 'Profile Picture', 'Customer selfie for verification'),
+(2, 'E-Signature', 'Digitized signature image'),
+(3, 'ID Front', 'Front photo of government ID'),
+(4, 'ID Back', 'Back photo of government ID');
+
+-- Insert Account Types
+INSERT INTO Account_Types (account_type_id, type_name, description, allows_passbook, allows_atm_card, requires_parent_guardian, minimum_age) VALUES 
+(1, 'Savings', 'Basic savings account', TRUE, TRUE, FALSE, NULL),
+(2, 'Junior Savings', 'Savings for minors', TRUE, FALSE, TRUE, 0),
+(3, 'Current', 'Current account for businesses', FALSE, TRUE, FALSE, NULL),
+(4, 'Time Deposit', 'Fixed term deposit', FALSE, FALSE, FALSE, 18);
+
+-- Insert Gender
+INSERT INTO Gender (gender_id, gender_name) VALUES 
+(1, 'Male'),
+(2, 'Female'),
+(3, 'Other');

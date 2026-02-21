@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Withdrawal Receipt - Evergreen Bank</title>
+    <link
+      href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="../assets/css/withdrawal-receipt.css" />
+    <style>
+      .btn-print {
+        background: linear-gradient(135deg, #2c5f2d 0%, #97bc62 100%);
+        color: white;
+        border: none;
+        padding: 12px 30px;
+        border-radius: 8px;
+        font-size: 16px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        margin-top: 20px;
+      }
+      .btn-print:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+        background: linear-gradient(135deg, #1e4620 0%, #7da350 100%);
+      }
+      .btn-print:active {
+        transform: translateY(0);
+      }
+      @media print {
+        @page {
+          size: A4;
+          margin: 0;
+        }
+
+        body {
+          margin: 0;
+          padding: 0;
+        }
+
+        body * {
+          visibility: hidden;
+        }
+        .receipt-card-floating,
+        .receipt-card-floating * {
+          visibility: visible;
+        }
+        .receipt-card-floating {
+          position: absolute;
+          left: 0;
+          top: 0;
+          width: 210mm;
+          height: 297mm;
+          margin: 0;
+          box-shadow: none !important;
+          padding: 15mm 20mm;
+          page-break-after: avoid;
+        }
+        .navbar,
+        .sidebar,
+        footer,
+        .receipt-complete-btn,
+        .receipt-back-btn,
+        .btn-print,
+        .receipt-button-group {
+          display: none !important;
+        }
+
+        /* Print Header */
+        .receipt-card-floating::before {
+          content: "";
+          display: block;
+          width: calc(100% + 40mm);
+          height: 60px;
+          background: linear-gradient(135deg, #2c5f2d 0%, #97bc62 100%);
+          margin: -15mm -20mm 15px -20mm;
+          padding: 15px;
+        }
+
+        .receipt-card-title::before {
+          content: "EVERGREEN BANK";
+          display: block;
+          font-size: 20px;
+          font-weight: 700;
+          color: #2c5f2d;
+          margin-bottom: 3px;
+          letter-spacing: 2px;
+        }
+
+        .receipt-card-title::after {
+          content: "Main Branch • Manila, Philippines";
+          display: block;
+          font-size: 11px;
+          color: #666;
+          font-weight: 400;
+          margin-top: 3px;
+          margin-bottom: 8px;
+        }
+
+        .receipt-card-title {
+          font-size: 16px;
+          text-align: center;
+          border-bottom: 2px solid #2c5f2d;
+          padding-bottom: 8px;
+          margin-bottom: 12px;
+        }
+
+        .receipt-divider {
+          display: none;
+        }
+
+        /* Print Footer */
+        .receipt-card-floating::after {
+          content: "This is an official receipt from Evergreen Bank. For verification, contact (02) 8800-1234 or visit www.evergreenbank.ph • Member PDIC - Max coverage: PHP 500,000 per depositor";
+          display: block;
+          margin-top: 15px;
+          padding-top: 10px;
+          border-top: 1px solid #ddd;
+          font-size: 8px;
+          color: #666;
+          text-align: center;
+          line-height: 1.3;
+        }
+
+        /* Transaction Details Enhancement */
+        .receipt-info-group {
+          page-break-inside: avoid;
+          margin-bottom: 10px;
+        }
+
+        .receipt-info-item {
+          font-size: 10px;
+          line-height: 1.6;
+          margin-bottom: 2px;
+        }
+
+        .receipt-info-label {
+          font-weight: 600;
+          color: #333;
+        }
+
+        .receipt-info-value {
+          color: #000;
+        }
+
+        .status-complete {
+          color: #4caf50 !important;
+          font-weight: 700 !important;
+        }
+
+        /* Print timestamp */
+        .receipt-grid::before {
+          content: "OFFICIAL BANK RECEIPT";
+          display: block;
+          text-align: center;
+          font-size: 9px;
+          color: #999;
+          margin-bottom: 10px;
+          letter-spacing: 1px;
+        }
+
+        /* Hide QR code area and show print-only elements */
+        .receipt-right-col {
+          display: none;
+        }
+
+        #print-only-info,
+        #print-bank-info,
+        #print-terms,
+        #print-signature {
+          display: block !important;
+        }
+
+        .receipt-left-col {
+          width: 100%;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Navigation Bar -->
+    <nav class="navbar navbar-expand-lg navbar-custom">
+      <div class="container-fluid">
+        <a class="navbar-brand d-flex align-items-center" href="#">
+          <img
+            src="../assets/img/evergreen_icon2.png"
+            alt="Logo"
+            class="logo"
+          />
+          <span class="brand-text">EVERGREEN</span>
+        </a>
+        <button
+          class="navbar-toggler"
+          type="button"
+          data-bs-toggle="collapse"
+          data-bs-target="#navbarNav"
+        >
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div
+          class="collapse navbar-collapse justify-content-center"
+          id="navbarNav"
+        >
+          <ul class="navbar-nav">
+            <li class="nav-item">
+              <a class="nav-link" href="#">Home</a>
+            </li>
+            <li class="nav-item">
+              <a
+                class="nav-link active"
+                href="employee-transaction.html"
+                id="navbar-transactions-link"
+                >Transactions</a
+              >
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="transaction-history.html"
+                >Transaction History</a
+              >
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="account-opening.html"
+                >Account Opening</a
+              >
+            </li>
+          </ul>
+        </div>
+        <div class="d-flex align-items-center ms-auto gap-2">
+          <span class="username-text me-2">Username</span>
+          <div class="user-avatar">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="10" fill="#003631" />
+              <circle cx="12" cy="9" r="3" fill="white" />
+              <path
+                d="M6 18.5C6 16.5 8.5 15 12 15C15.5 15 18 16.5 18 18.5"
+                stroke="white"
+                stroke-width="2"
+                stroke-linecap="round"
+              />
+            </svg>
+          </div>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="main-wrapper">
+      <div class="row g-0">
+        <!-- Sidebar -->
+        <div class="col-auto sidebar">
+          <h4 class="sidebar-title">Transactions</h4>
+          <div class="transaction-buttons">
+            <button class="btn transaction-btn active">
+              <svg
+                width="30"
+                height="30"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <rect x="2" y="5" width="20" height="14" rx="2" />
+                <line x1="2" y1="10" x2="22" y2="10" />
+              </svg>
+              Withdraw
+            </button>
+            <button class="btn transaction-btn">
+              <svg
+                width="30"
+                height="30"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <rect x="2" y="5" width="20" height="14" rx="2" />
+                <line x1="12" y1="12" x2="12" y2="16" />
+                <line x1="10" y1="14" x2="14" y2="14" />
+              </svg>
+              Deposit
+            </button>
+          </div>
+        </div>
+
+        <!-- Receipt Content -->
+        <div class="col content-area">
+          <div class="receipt-card-wrapper">
+            <div class="receipt-card-floating">
+              <h3 class="receipt-card-title">Withdrawal Receipt</h3>
+              <hr class="receipt-divider" />
+
+              <div class="receipt-grid">
+                <!-- Left Column -->
+                <div class="receipt-left-col">
+                  <div class="receipt-info-group">
+                    <div class="receipt-info-item">
+                      <span class="receipt-info-label">Withdrawal Type:</span>
+                      <span class="receipt-info-value">Cash Withdrawal</span>
+                    </div>
+                    <div class="receipt-info-item">
+                      <span class="receipt-info-label">Date and Time:</span>
+                      <span class="receipt-info-value" id="receipt-date"></span>
+                    </div>
+                    <div class="receipt-info-item">
+                      <span class="receipt-info-label">Reference Number:</span>
+                      <span
+                        class="receipt-info-value"
+                        id="receipt-reference"
+                      ></span>
+                    </div>
+                  </div>
+
+                  <div class="receipt-info-group">
+                    <div class="receipt-info-item">
+                      <span class="receipt-info-label">Account Number:</span>
+                      <span
+                        class="receipt-info-value"
+                        id="receipt-account-number"
+                      ></span>
+                    </div>
+                    <div class="receipt-info-item">
+                      <span class="receipt-info-label">Account Name:</span>
+                      <span
+                        class="receipt-info-value"
+                        id="receipt-account-name"
+                      ></span>
+                    </div>
+                    <div class="receipt-info-item">
+                      <span class="receipt-info-label">Account Type:</span>
+                      <span
+                        class="receipt-info-value"
+                        id="receipt-account-type"
+                      ></span>
+                    </div>
+                    <div class="receipt-info-item">
+                      <span class="receipt-info-label">Withdrawal Amount:</span>
+                      <span
+                        class="receipt-info-value"
+                        id="receipt-amount"
+                      ></span>
+                    </div>
+                    <div class="receipt-info-item">
+                      <span class="receipt-info-label">Previous Balance:</span>
+                      <span
+                        class="receipt-info-value"
+                        id="receipt-previous-balance"
+                      ></span>
+                    </div>
+                    <div class="receipt-info-item">
+                      <span class="receipt-info-label">New Balance:</span>
+                      <span
+                        class="receipt-info-value"
+                        id="receipt-balance"
+                      ></span>
+                    </div>
+                  </div>
+
+                  <div class="receipt-info-group">
+                    <div class="receipt-info-item">
+                      <span class="receipt-info-label">Branch:</span>
+                      <span
+                        class="receipt-info-value"
+                        id="receipt-branch"
+                      ></span>
+                    </div>
+                    <div class="receipt-info-item">
+                      <span class="receipt-info-label">Terminal:</span>
+                      <span
+                        class="receipt-info-value"
+                        id="receipt-terminal"
+                      ></span>
+                    </div>
+                    <div class="receipt-info-item">
+                      <span class="receipt-info-label">Processed By:</span>
+                      <span
+                        class="receipt-info-value"
+                        id="receipt-employee"
+                      ></span>
+                    </div>
+                    <div class="receipt-info-item">
+                      <span class="receipt-info-label">Status:</span>
+                      <span class="receipt-info-value status-complete"
+                        >COMPLETED</span
+                      >
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Right Column - Print Button -->
+                <div class="receipt-right-col">
+                  <div class="text-center">
+                    <button
+                      type="button"
+                      class="btn btn-print"
+                      onclick="printReceipt()"
+                    >
+                      <svg
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        style="vertical-align: middle; margin-right: 8px"
+                      >
+                        <path
+                          d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"
+                        />
+                        <rect x="6" y="14" width="12" height="8" />
+                      </svg>
+                      Print Receipt
+                    </button>
+                  </div>
+
+                  <!-- Print Only: Additional Information -->
+                  <div
+                    class="receipt-info-group"
+                    style="display: none"
+                    id="print-only-info"
+                  >
+                    <div class="receipt-info-item">
+                      <span class="receipt-info-label">Important Notice:</span>
+                      <span
+                        class="receipt-info-value"
+                        style="display: block; margin-top: 5px; font-size: 9px"
+                      >
+                        Please retain this receipt for your records. This
+                        document serves as proof of transaction and may be
+                        required for account reconciliation.
+                      </span>
+                    </div>
+                  </div>
+
+                  <!-- Print Only: Bank Information -->
+                  <div
+                    class="receipt-info-group"
+                    style="display: none; margin-top: 20px"
+                    id="print-bank-info"
+                  >
+                    <h5
+                      style="
+                        font-size: 13px;
+                        font-weight: 700;
+                        color: #2c5f2d;
+                        border-bottom: 1px solid #ddd;
+                        padding-bottom: 5px;
+                        margin-bottom: 10px;
+                      "
+                    >
+                      Bank Information
+                    </h5>
+                    <div class="receipt-info-item">
+                      <span class="receipt-info-label">Institution:</span>
+                      <span class="receipt-info-value"
+                        >Evergreen Bank, N.A.</span
+                      >
+                    </div>
+                    <div class="receipt-info-item">
+                      <span class="receipt-info-label">Branch Code:</span>
+                      <span class="receipt-info-value">001-MNL</span>
+                    </div>
+                    <div class="receipt-info-item">
+                      <span class="receipt-info-label">Contact:</span>
+                      <span class="receipt-info-value">(02) 8800-1234</span>
+                    </div>
+                    <div class="receipt-info-item">
+                      <span class="receipt-info-label">Email:</span>
+                      <span class="receipt-info-value"
+                        >support@evergreenbank.ph</span
+                      >
+                    </div>
+                  </div>
+
+                  <!-- Print Only: Terms and Conditions -->
+                  <div
+                    class="receipt-info-group"
+                    style="display: none; margin-top: 20px"
+                    id="print-terms"
+                  >
+                    <h5
+                      style="
+                        font-size: 13px;
+                        font-weight: 700;
+                        color: #2c5f2d;
+                        border-bottom: 1px solid #ddd;
+                        padding-bottom: 5px;
+                        margin-bottom: 10px;
+                      "
+                    >
+                      Terms & Conditions
+                    </h5>
+                    <div style="font-size: 9px; line-height: 1.6; color: #666">
+                      <p style="margin: 0 0 8px 0">
+                        • This transaction is subject to verification and
+                        clearing procedures.
+                      </p>
+                      <p style="margin: 0 0 8px 0">
+                        • All withdrawals are subject to available balance and
+                        daily limits.
+                      </p>
+                      <p style="margin: 0 0 8px 0">
+                        • The bank reserves the right to verify withdrawal
+                        requests.
+                      </p>
+                      <p style="margin: 0">
+                        • For inquiries, please present this receipt at any
+                        branch.
+                      </p>
+                    </div>
+                  </div>
+
+                  <!-- Print Only: Authorized Signature -->
+                  <div
+                    style="display: none; margin-top: 30px"
+                    id="print-signature"
+                  >
+                    <div
+                      style="
+                        border-top: 1px solid #000;
+                        padding-top: 5px;
+                        margin-top: 40px;
+                        text-align: center;
+                      "
+                    >
+                      <span style="font-size: 10px; color: #333"
+                        >Authorized Bank Representative</span
+                      >
+                    </div>
+                    <p
+                      style="
+                        font-size: 8px;
+                        color: #999;
+                        text-align: center;
+                        margin-top: 5px;
+                      "
+                    >
+                      No signature required - System Generated Receipt
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Buttons -->
+              <div class="receipt-button-group">
+                <button type="button" class="btn receipt-complete-btn">
+                  Complete
+                </button>
+                <button type="button" class="btn receipt-back-btn">Back</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Success Modal -->
+    <div class="modal-overlay" id="modalOverlay"></div>
+    <div class="success-modal" id="successModal">
+      <div class="modal-content">
+        <div class="modal-icon">
+          <svg width="60" height="60" viewBox="0 0 60 60" fill="none">
+            <circle cx="30" cy="30" r="30" fill="#4CAF50" />
+            <path
+              d="M16 30L26 40L44 20"
+              stroke="white"
+              stroke-width="4"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+        </div>
+        <h3 class="modal-title">Transaction Success</h3>
+        <button type="button" class="btn modal-ok-btn">OK</button>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <div class="container-fluid px-4">
+        <div class="row align-items-center">
+          <div class="col-md-6">
+            <p class="footer-text mb-0">
+              © 2023 Evergreen Bank. All rights reserved.
+            </p>
+            <p class="footer-small mb-0">
+              Member FDIC. Equal Housing Lender. Evergreen Bank, N.A.
+            </p>
+          </div>
+          <div class="col-md-6 text-md-end mt-2 mt-md-0">
+            <a href="#" class="footer-link">Privacy Policy</a>
+            <span class="footer-divider">|</span>
+            <a href="#" class="footer-link">Terms and Agreements</a>
+            <span class="footer-divider">|</span>
+            <a href="#" class="footer-link">FAQS</a>
+            <span class="footer-divider">|</span>
+            <a href="#" class="footer-link">About Us</a>
+          </div>
+        </div>
+      </div>
+    </footer>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/js/bootstrap.bundle.min.js"></script>
+    <script src="../assets/js/withdrawal-receipt.js?v=3"></script>
+  </body>
+</html>

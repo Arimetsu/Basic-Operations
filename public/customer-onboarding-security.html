@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Evergreen - Document Verification</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="../assets/css/customer-onboarding-security.css"
+    />
+  </head>
+  <body>
+    <div class="page-container">
+      <div class="main-card">
+        <!-- Header -->
+        <div class="header-section">
+          <div class="logo-container">
+            <img
+              src="../assets/img/evergreen_icon.png"
+              alt="Logo"
+              class="logo"
+            />
+            <div class="logo-placeholder">
+              <div class="logo-text">
+                <span class="brand-name">EVERGREEN</span>
+                <span class="brand-tagline">Secure. Invest. Achieve</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step Indicator -->
+        <div class="step-indicator">
+          <h5>Step 2 of 3: Document Verification</h5>
+        </div>
+
+        <!-- Main Content -->
+        <div class="content-wrapper">
+          <!-- Sidebar Navigation -->
+          <div class="sidebar">
+            <div class="nav-item">
+              <span class="nav-number">1.</span> Personal Details
+            </div>
+            <div class="nav-item active">
+              <span class="nav-number">2.</span> Document Verification
+            </div>
+            <div class="nav-item">
+              <span class="nav-number">3.</span> Review
+            </div>
+          </div>
+
+          <!-- Main Form Content -->
+          <div class="form-section">
+            <form id="documentForm" enctype="multipart/form-data">
+              <!-- Document Verification Section -->
+              <div class="section-title">Document Verification</div>
+
+              <p style="color: #666; font-size: 14px; margin-bottom: 25px">
+                Please upload clear photos or scans of your valid
+                government-issued ID. Accepted formats: JPG, PNG, PDF (max 5MB
+                per file)
+              </p>
+
+              <div class="security-layout">
+                <!-- Left Column: ID Upload -->
+                <div class="credentials-column">
+                  <div class="subsection-title">Upload Your Valid ID</div>
+
+                  <div class="form-group">
+                    <label>ID Type <span style="color: red">*</span></label>
+                    <select
+                      name="id_type"
+                      id="id_type"
+                      class="form-control"
+                      required
+                    >
+                      <option value="">Select ID Type</option>
+                      <option value="Passport">Passport</option>
+                      <option value="Driver's License">Driver's License</option>
+                      <option value="National ID">National ID (PhilSys)</option>
+                      <option value="UMID">UMID</option>
+                      <option value="SSS ID">SSS ID</option>
+                      <option value="PRC ID">PRC ID</option>
+                      <option value="Voter's ID">Voter's ID</option>
+                      <option value="Postal ID">Postal ID</option>
+                      <option value="TIN ID">TIN ID</option>
+                    </select>
+                    <small
+                      style="
+                        color: #666;
+                        font-size: 11px;
+                        display: block;
+                        margin-top: 5px;
+                      "
+                    >
+                      Select the type of ID you will be uploading
+                    </small>
+                  </div>
+
+                  <div class="form-group">
+                    <label>Front of ID <span style="color: red">*</span></label>
+                    <div class="file-upload-wrapper">
+                      <input
+                        type="file"
+                        name="id_front"
+                        id="id_front"
+                        class="file-input"
+                        accept="image/jpeg,image/png,image/jpg,application/pdf"
+                        required
+                      />
+                      <label for="id_front" class="file-upload-label">
+                        <svg
+                          width="24"
+                          height="24"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2"
+                        >
+                          <path
+                            d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"
+                          ></path>
+                          <polyline points="17 8 12 3 7 8"></polyline>
+                          <line x1="12" y1="3" x2="12" y2="15"></line>
+                        </svg>
+                        <span class="file-label-text"
+                          >Choose File or Drag Here</span
+                        >
+                        <span class="file-name"></span>
+                      </label>
+                    </div>
+                    <small style="color: #666; font-size: 11px">
+                      Upload a clear photo of the front of your ID
+                    </small>
+                    <div class="file-preview" id="preview_id_front"></div>
+                  </div>
+
+                  <div class="form-group">
+                    <label>Back of ID <span style="color: red">*</span></label>
+                    <div class="file-upload-wrapper">
+                      <input
+                        type="file"
+                        name="id_back"
+                        id="id_back"
+                        class="file-input"
+                        accept="image/jpeg,image/png,image/jpg,application/pdf"
+                        required
+                      />
+                      <label for="id_back" class="file-upload-label">
+                        <svg
+                          width="24"
+                          height="24"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2"
+                        >
+                          <path
+                            d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"
+                          ></path>
+                          <polyline points="17 8 12 3 7 8"></polyline>
+                          <line x1="12" y1="3" x2="12" y2="15"></line>
+                        </svg>
+                        <span class="file-label-text"
+                          >Choose File or Drag Here</span
+                        >
+                        <span class="file-name"></span>
+                      </label>
+                    </div>
+                    <small style="color: #666; font-size: 11px">
+                      Upload a clear photo of the back of your ID (if
+                      applicable)
+                    </small>
+                    <div class="file-preview" id="preview_id_back"></div>
+                  </div>
+                </div>
+
+                <!-- Right Column: ID Number & Instructions -->
+                <div class="mfa-column">
+                  <div class="subsection-title">Identification Number</div>
+
+                  <div class="form-group">
+                    <label>ID Number <span style="color: red">*</span></label>
+                    <input
+                      type="text"
+                      name="id_number"
+                      id="id_number"
+                      class="form-control"
+                      placeholder="Enter your ID number"
+                      required
+                      maxlength="100"
+                    />
+                    <small style="color: #666; font-size: 11px">
+                      Enter the ID number shown on your selected document
+                    </small>
+                  </div>
+
+                  <div class="info-box" style="margin-top: 30px">
+                    <div style="display: flex; align-items: start; gap: 12px">
+                      <svg
+                        width="24"
+                        height="24"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="#1a6b62"
+                        stroke-width="2"
+                        style="flex-shrink: 0; margin-top: 2px"
+                      >
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="16" x2="12" y2="12"></line>
+                        <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                      </svg>
+                      <div>
+                        <h4
+                          style="
+                            font-size: 14px;
+                            font-weight: 600;
+                            color: #1a6b62;
+                            margin: 0 0 8px 0;
+                          "
+                        >
+                          Document Requirements
+                        </h4>
+                        <ul
+                          style="
+                            margin: 0;
+                            padding-left: 18px;
+                            font-size: 12px;
+                            color: #666;
+                          "
+                        >
+                          <li>Images must be clear and readable</li>
+                          <li>All four corners of the ID must be visible</li>
+                          <li>File size should not exceed 5MB</li>
+                          <li>Accepted formats: JPG, PNG, PDF</li>
+                          <li>ID must be valid (not expired)</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div
+                    class="info-box"
+                    style="
+                      margin-top: 15px;
+                      background: #fff3cd;
+                      border-left: 4px solid #ffc107;
+                    "
+                  >
+                    <div style="display: flex; align-items: start; gap: 12px">
+                      <svg
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="#856404"
+                        stroke-width="2"
+                        style="flex-shrink: 0; margin-top: 2px"
+                      >
+                        <path
+                          d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"
+                        ></path>
+                        <line x1="12" y1="9" x2="12" y2="13"></line>
+                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                      </svg>
+                      <div>
+                        <p style="margin: 0; font-size: 12px; color: #856404">
+                          <strong>Security Notice:</strong> Your documents are
+                          encrypted and stored securely. They will only be used
+                          for verification purposes.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Action Buttons -->
+              <div class="button-group">
+                <button type="submit" class="btn btn-continue">Continue</button>
+                <button
+                  type="button"
+                  class="btn btn-cancel"
+                  onclick="window.location.href='employee-dashboard.html'"
+                >
+                  Cancel
+                </button>
+                <button type="button" class="btn btn-back">Back</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <style>
+      /* File Upload Styles */
+      .file-upload-wrapper {
+        position: relative;
+        margin-bottom: 10px;
+      }
+
+      .file-input {
+        position: absolute;
+        opacity: 0;
+        width: 0;
+        height: 0;
+      }
+
+      .file-upload-label {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 30px 20px;
+        border: 2px dashed #ccc;
+        border-radius: 8px;
+        background-color: #fafafa;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        min-height: 120px;
+      }
+
+      .file-upload-label:hover {
+        border-color: #1a6b62;
+        background-color: #f0f7f5;
+      }
+
+      .file-upload-label svg {
+        color: #666;
+        margin-bottom: 10px;
+      }
+
+      .file-label-text {
+        font-size: 14px;
+        color: #666;
+        font-weight: 500;
+      }
+
+      .file-name {
+        font-size: 12px;
+        color: #1a6b62;
+        margin-top: 8px;
+        font-weight: 600;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .file-input:focus + .file-upload-label {
+        border-color: #1a6b62;
+        box-shadow: 0 0 0 3px rgba(26, 107, 98, 0.1);
+      }
+
+      .file-upload-wrapper.has-file .file-upload-label {
+        border-color: #1a6b62;
+        background-color: #f0f7f5;
+      }
+
+      .file-preview {
+        margin-top: 15px;
+        display: none;
+      }
+
+      .file-preview.show {
+        display: block;
+      }
+
+      .file-preview img {
+        max-width: 100%;
+        max-height: 200px;
+        border-radius: 8px;
+        border: 1px solid #ddd;
+      }
+
+      .info-box {
+        background-color: #f0f7f5;
+        border-radius: 8px;
+        padding: 15px;
+        border-left: 4px solid #1a6b62;
+      }
+
+      .mobile-input-group {
+        display: flex;
+        gap: 10px;
+      }
+    </style>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="../assets/js/customer-onboarding-security.js"></script>
+  </body>
+</html>
