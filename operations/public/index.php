@@ -18,6 +18,9 @@ if (file_exists($envFile)) {
     }
 }
 
+// Load Composer autoloader
+require_once ROOT_PATH . '/vendor/autoload.php';
+
 require_once ROOT_PATH . '/core/App.php';
 require_once ROOT_PATH . '/core/Controller.php';
 require_once ROOT_PATH . '/core/Database.php';

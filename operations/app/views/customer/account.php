@@ -117,17 +117,21 @@
             $groupedAccounts = [];
             if (isset($data['accounts']) && is_array($data['accounts'])) {
                 foreach ($data['accounts'] as $account) {
-                    $type = strtolower($account->account_type);
-                    if (str_contains($type, 'savings')) {
+                    $type = strtolower(trim($account->account_type ?? ''));
+                    
+                    // More robust account type detection
+                    if (str_contains($type, 'saving')) {
                         $groupedAccounts['Savings Accounts'][] = $account;
-                    } elseif (str_contains($type, 'checking')) {
+                    } elseif (str_contains($type, 'check')) {
                         $groupedAccounts['Checking Accounts'][] = $account;
-                    } elseif (str_contains($type, 'credit card')) {
+                    } elseif (str_contains($type, 'credit') || str_contains($type, 'card')) {
                         $groupedAccounts['Credit Cards'][] = $account;
                     } elseif (str_contains($type, 'loan')) {
                         $groupedAccounts['Loan Accounts'][] = $account;
                     } 
                      else {
+                        // For debugging: log the unmatched type
+                        error_log("Unmatched account type: " . $account->account_type);
                         $groupedAccounts['Other Accounts'][] = $account; // Fallback for other types
                     }
                 }
@@ -506,7 +510,7 @@
         </div>
 
         <!----------------------- MAIN CONTENT ------------------------------------------------------------------------------------->
-        <div class="col-md-7 col-lg-8 pt-5 shadow-sm" id="main-account-content" style="height: 100%; <?= empty($data['accounts']) ? 'overflow-y: auto;' : 'overflow-y: hidden;' ?>">
+        <div class="col-md-7 col-lg-8 pt-5 shadow-sm" id="main-account-content" style="height: 100%; overflow-y: auto;">
             <div class="d-flex justify-content-between align-items-center">
                 <h4 class="fw-bold mb-0 px-4"> <?= htmlspecialchars($data['user_name'] ?? ($data['first_name'] . ' ' . $data['last_name']) ?? 'Customer'); ?></h4>
             </div>
@@ -650,6 +654,7 @@
                                     </div>
                                     <div class="text-end">
                                         <span class="<?= $amountColor; ?> fw-semibold"><?= $amountSign; ?>PHP <?= number_format($transaction->amount, 2); ?></span><br>
+                                        <small class="text-muted">Balance: <?= isset($transaction->balance_after) && $transaction->balance_after !== null ? 'PHP ' . number_format($transaction->balance_after, 2) : 'N/A'; ?></small><br>
                                         <small class="text-muted"><?= date('d F Y', strtotime($transaction->created_at)); ?><br><?= date('h:i A', strtotime($transaction->created_at)); ?></small>
                                     </div>
                                 </div>
@@ -788,6 +793,11 @@
                 const transactionDate = new Date(transaction.created_at);
                 const formattedDate = transactionDate.toLocaleDateString('en-PH', { day: '2-digit', month: 'long', year: 'numeric' });
                 const formattedTime = transactionDate.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit', hour12: true });
+                
+                // Use balance_after if available
+                const balanceAfter = transaction.balance_after !== null && transaction.balance_after !== undefined 
+                    ? formatCurrency(transaction.balance_after) 
+                    : 'N/A';
 
                 const transactionItem = `
                     <div class="list-group-item d-flex justify-content-between align-items-center border rounded mb-4" style="background-color: #D9D9D94D;">
@@ -805,6 +815,7 @@
                         </div>
                         <div class="text-end">
                             <span class="${amountColor} fw-semibold">${amountSign}${formatCurrency(transaction.amount)}</span><br>
+                            <small class="text-muted">Balance: ${balanceAfter}</small><br>
                             <small class="text-muted">${formattedDate}<br>${formattedTime}</small>
                         </div>
                     </div>
@@ -819,7 +830,7 @@
 
     // --- Function to Filter and Search Accounts ---
     function filterAndSearchAccounts() {
-        const searchTerm = accountSearchInput.value.toLowerCase();
+        const searchTerm = accountSearchInput ? accountSearchInput.value.toLowerCase() : '';
         const selectedAccountTypes = Array.from(filterCheckboxes)
                                         .filter(cb => cb.checked)
                                         .map(cb => cb.dataset.accountType.toLowerCase());
@@ -840,11 +851,11 @@
 
             cardsInGroup.forEach(card => {
                 const accountId = card.dataset.accountId;
-                const accountName = card.dataset.accountName.toLowerCase();
-                const accountNumber = card.dataset.accountNumber.toLowerCase();
-                const accountType = card.dataset.accountType.toLowerCase();
+                const accountName = (card.dataset.accountName || '').toLowerCase();
+                const accountNumber = (card.dataset.accountNumber || '').toLowerCase();
+                const accountType = (card.dataset.accountType || '').toLowerCase();
 
-                const matchesSearch = accountName.includes(searchTerm) || accountNumber.includes(searchTerm);
+                const matchesSearch = searchTerm === '' || accountName.includes(searchTerm) || accountNumber.includes(searchTerm);
                 // Use partial matching for account type filter (e.g., "savings" matches "savings account")
                 const matchesTypeFilter = selectedAccountTypes.length === 0 || 
                     selectedAccountTypes.some(filterType => accountType.includes(filterType));
@@ -852,7 +863,7 @@
                 const isExplicitlyShown = showHideStates[accountId] === undefined || showHideStates[accountId];
 
                 if (matchesSearch && matchesTypeFilter && isExplicitlyShown) {
-                    card.style.display = ''; // Show card
+                    card.style.display = 'block'; // Show card
                     groupHasVisibleCards = true;
                     if (!firstVisibleCard) {
                         firstVisibleCard = card;
@@ -864,8 +875,8 @@
 
             // Show/hide group title and container based on whether it has visible cards
             if (groupHasVisibleCards) {
-                groupContainer.style.display = '';
-                if (groupTitle) groupTitle.style.display = '';
+                groupContainer.style.display = 'block';
+                if (groupTitle) groupTitle.style.display = 'block';
             } else {
                 groupContainer.style.display = 'none';
                 if (groupTitle) groupTitle.style.display = 'none';
@@ -885,40 +896,46 @@
             updateMainContent(firstVisibleCard);
         } else {
             // If no accounts are visible after filtering, clear main content
-            detailAccountNumber.textContent = 'N/A';
-            detailAccountName.textContent = 'N/A';
-            detailAccountType.textContent = 'N/A';
-            balanceRow.style.display = 'flex'; // Default to showing balance row
-            creditCardDetails.style.display = 'none';
-            detailAvailableBalance.textContent = formatCurrency(0);
-            transactionHistoryList.innerHTML = '<p class="text-muted text-center">No accounts found matching your criteria.</p>';
+            if (detailAccountNumber) detailAccountNumber.textContent = 'N/A';
+            if (detailAccountName) detailAccountName.textContent = 'N/A';
+            if (detailAccountType) detailAccountType.textContent = 'N/A';
+            if (balanceRow) balanceRow.style.display = 'flex';
+            if (creditCardDetails) creditCardDetails.style.display = 'none';
+            if (detailAvailableBalance) detailAvailableBalance.textContent = formatCurrency(0);
+            if (transactionHistoryList) transactionHistoryList.innerHTML = '<p class="text-muted text-center">No accounts found matching your criteria.</p>';
         }
     }
 
     // --- Event Listeners for Search and Account Type Filters ---
-    accountSearchInput.addEventListener('input', filterAndSearchAccounts);
+    if (accountSearchInput) {
+        accountSearchInput.addEventListener('input', filterAndSearchAccounts);
+    }
 
-    applyFiltersBtn.addEventListener('click', function() {
-        filterAndSearchAccounts();
-        // Close the dropdown after applying filters
-        const dropdownElement = document.querySelector('.dropdown-menu.show');
-        if (dropdownElement) {
-            const bsDropdown = bootstrap.Dropdown.getInstance(dropdownElement.previousElementSibling);
-            if (bsDropdown) bsDropdown.hide();
-        }
-    });
+    if (applyFiltersBtn) {
+        applyFiltersBtn.addEventListener('click', function() {
+            filterAndSearchAccounts();
+            // Close the dropdown after applying filters
+            const dropdownElement = document.querySelector('.dropdown-menu.show');
+            if (dropdownElement) {
+                const bsDropdown = bootstrap.Dropdown.getInstance(dropdownElement.previousElementSibling);
+                if (bsDropdown) bsDropdown.hide();
+            }
+        });
+    }
 
-    resetFiltersBtn.addEventListener('click', function() {
-        filterCheckboxes.forEach(cb => cb.checked = false);
-        accountSearchInput.value = ''; // Clear search input on reset
-        filterAndSearchAccounts();
-        // Close the dropdown after resetting filters
-        const dropdownElement = document.querySelector('.dropdown-menu.show');
-        if (dropdownElement) {
-            const bsDropdown = bootstrap.Dropdown.getInstance(dropdownElement.previousElementSibling);
-            if (bsDropdown) bsDropdown.hide();
-        }
-    });
+    if (resetFiltersBtn) {
+        resetFiltersBtn.addEventListener('click', function() {
+            filterCheckboxes.forEach(cb => cb.checked = false);
+            if (accountSearchInput) accountSearchInput.value = ''; // Clear search input on reset
+            filterAndSearchAccounts();
+            // Close the dropdown after resetting filters
+            const dropdownElement = document.querySelector('.dropdown-menu.show');
+            if (dropdownElement) {
+                const bsDropdown = bootstrap.Dropdown.getInstance(dropdownElement.previousElementSibling);
+                if (bsDropdown) bsDropdown.hide();
+            }
+        });
+    }
 
 
     // --- Show/Hide Account Modal Logic ---
@@ -963,7 +980,9 @@
 
     // Also, ensure filters are applied when the modal is initially shown
     if (showHideAccountModalElement) {
-        showHideAccountModalElement.addEventListener('shown.bs.modal', filterAndSearchAccounts);
+        showHideAccountModalElement.addEventListener('shown.bs.modal', function() {
+            filterAndSearchAccounts();
+        });
     }
 
 
@@ -988,24 +1007,12 @@
 
     // --- Auto-open Add Account Modal if there are errors ---
     <?php if (!empty($data['show_add_account_modal']) && $data['show_add_account_modal']): ?>
-    document.addEventListener('DOMContentLoaded', function() {
-        const addAccountModal = new bootstrap.Modal(document.getElementById('addAccountModal'));
-        addAccountModal.show();
-    });
+    const addAccountModal = new bootstrap.Modal(document.getElementById('addAccountModal'));
+    addAccountModal.show();
     <?php endif; ?>
-    // --- Initialize content with the first active/visible card on page load ---
-    // This needs to happen AFTER all filtering logic is set up
-    filterAndSearchAccounts(); // Apply all filters (search, type, show/hide) initially
 
-    const initialActiveCard = document.querySelector('.account-card.active');
-    if (!initialActiveCard) { // If no active card found after initial filtering
-        // Find the very first visible card after filtering and make it active
-        const firstTrulyVisibleCard = document.querySelector('.account-card[style*="display: block"], .account-card:not([style*="display: none"])');
-        if (firstTrulyVisibleCard) {
-            firstTrulyVisibleCard.classList.add('active');
-            firstTrulyVisibleCard.style.backgroundColor = '#D9D9D9';
-            updateMainContent(firstTrulyVisibleCard);
-        }
-    }
+    // --- Initialize content on page load ---
+    // Apply all filters (search, type, show/hide) initially and set first visible card as active
+    filterAndSearchAccounts();
 });
 </script>

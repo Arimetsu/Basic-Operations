@@ -30,6 +30,23 @@ $queryBase = buildFilterQuery($filters);
     <!--------------------------- PAGE TITLE --------------------------------------------------------------------------------------->
     <h2 class="fw-bold mb-4" style="color: #003631;">Transaction History</h2>
 
+    <!--------------------------- SUCCESS/ERROR MESSAGES --------------------------------------------------------------------------------------->
+    <?php if (isset($_SESSION['export_success'])): ?>
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <i class="bi bi-check-circle-fill me-2"></i>
+            <?php echo $_SESSION['export_success']; unset($_SESSION['export_success']); ?>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    <?php endif; ?>
+    
+    <?php if (isset($_SESSION['export_error'])): ?>
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+            <?php echo $_SESSION['export_error']; unset($_SESSION['export_error']); ?>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    <?php endif; ?>
+
     <!--------------------------- FILTERS SECTION (Wrapped in a form for submission) ------------------------------------------------->
     <form method="GET" action="<?php echo URLROOT; ?>/customer/transaction_history">
         <div class="row mb-4 g-3">
@@ -109,12 +126,13 @@ $queryBase = buildFilterQuery($filters);
         </p>
         <div class="dropdown">
             <a class="text-decoration-none fw-semibold dropdown-toggle" href="#" role="button" id="dropdownMenuLink" data-bs-toggle="dropdown" aria-expanded="false" style="color: #003631;z-index: 2000">
-                <i class="bi bi-download me-1"></i> Export
+                <i class="bi bi-envelope me-1"></i> Email Report
             </a>
 
             <ul class="dropdown-menu" aria-labelledby="dropdownMenuLink">
-                <li><a class="dropdown-item" href="<?php echo URLROOT; ?>/customer/export_transactions?type=csv&<?php echo $queryBase; ?>">CSV (.csv)</a></li>
-                <li><a class="dropdown-item" href="<?php echo URLROOT; ?>/customer/export_transactions?type=pdf&<?php echo $queryBase; ?>">PDF (.pdf)</a></li>
+                <li><a class="dropdown-item" href="<?php echo URLROOT; ?>/customer/export_transactions?type=pdf&<?php echo $queryBase; ?>">
+                    <i class="bi bi-file-pdf me-2"></i>Email as PDF
+                </a></li>
             </ul>
         </div>
     </div>

@@ -1,5 +1,8 @@
 <?php
 
+use PHPMailer\PHPMailer\PHPMailer;
+use PHPMailer\PHPMailer\Exception;
+
 class CustomerController extends Controller {
     private $customerModel;
 
@@ -342,12 +345,13 @@ class CustomerController extends Controller {
                     if (!filter_var($new_email, FILTER_VALIDATE_EMAIL)) {
                         $_SESSION['profile_error'] = 'Invalid email address format.';
                     } else {
-                        // Add email
+                        // Add or reactivate email
                         $result = $this->customerModel->addCustomerEmail($customer_id, $new_email, $set_primary);
                         if ($result) {
-                            $_SESSION['profile_success'] = 'Email added successfully!';
+                            $_SESSION['profile_success'] = 'Email added/reactivated successfully!';
                         } else {
-                            $_SESSION['profile_error'] = 'Failed to add email. It may already exist.';
+                            // Check error log for specific reason - provide user-friendly message
+                            $_SESSION['profile_error'] = 'Failed to add email. This email may already be in use by you or another customer. Please check the browser console or server logs for details.';
                         }
                     }
                 } elseif ($contact_type === 'phone' && !empty($_POST['new_phone'])) {
@@ -357,12 +361,12 @@ class CustomerController extends Controller {
                     if (strlen($new_phone) < 10) {
                         $_SESSION['profile_error'] = 'Invalid phone number format.';
                     } else {
-                        // Add phone
+                        // Add or reactivate phone
                         $result = $this->customerModel->addCustomerPhone($customer_id, $new_phone, $set_primary);
                         if ($result) {
-                            $_SESSION['profile_success'] = 'Phone number added successfully!';
+                            $_SESSION['profile_success'] = 'Phone number added/reactivated successfully!';
                         } else {
-                            $_SESSION['profile_error'] = 'Failed to add phone number.';
+                            $_SESSION['profile_error'] = 'Failed to add phone number. This number may already be in use. Please check the browser console or server logs for details.';
                         }
                     }
                 } else {
@@ -1061,20 +1065,17 @@ class CustomerController extends Controller {
             'start_date' => $_GET['start_date'] ?? '',
             'end_date'   => $_GET['end_date'] ?? '',
         ];
-        $exportType = strtolower($_GET['type'] ?? 'csv');
+        $exportType = strtolower($_GET['type'] ?? 'pdf');
 
         // 2. Call a model method to fetch ALL transactions matching the filters
-        // Pass customer_id and filters
         $transactions = $this->customerModel->getAllFilteredTransactions($customer_id, $filters); 
 
-        // 3. Generate and output the file based on $exportType
-        if ($exportType === 'csv') {
-            $this->generateCSV($transactions);
-        } elseif ($exportType === 'pdf') {
-            // You would need a PDF library integrated for this (TCPDF seems to be set up)
-            $this->generatePDF($transactions);
+        // 3. Email the PDF instead of downloading
+        if ($exportType === 'pdf') {
+            $this->emailTransactionPDF($transactions, $customer_id, $filters);
         } else {
             // Handle invalid type
+            $_SESSION['export_error'] = 'Invalid export type.';
             header('Location: ' . URLROOT . '/customer/transaction_history');
             exit;
         }
@@ -1125,12 +1126,7 @@ class CustomerController extends Controller {
         exit;
     }
 
-    protected function generatePDF($transactions) {
-        // Clean any output buffers
-        if (ob_get_level()) {
-            ob_end_clean();
-        }
-        
+    protected function generatePDF($transactions, $returnContent = false) {
         require_once ROOT_PATH . '/vendor/autoload.php';
 
         // --- Compute Date Range ---
@@ -1158,8 +1154,6 @@ class CustomerController extends Controller {
         $pdf->AddPage();
 
         // Check if logo exists, use absolute path
-        $logo = ROOT_PATH . '/public/img/logo.jpg';
-        $logoExists = file_exists($logo);
         $logo = ROOT_PATH . '/public/img/logo.jpg';
         $logoExists = file_exists($logo);
         $customer_name = $_SESSION['customer_first_name'] . ' ' . $_SESSION['customer_last_name'];
@@ -1235,64 +1229,112 @@ class CustomerController extends Controller {
 
         $pdf->writeHTML($html, true, false, true, false, '');
 
-        $pdf->Output('statement_' . date('Ymd') . '.pdf', 'D');
+        if ($returnContent) {
+            return $pdf->Output('statement_' . date('Ymd') . '.pdf', 'S');
+        } else {
+            // Clean any output buffers
+            if (ob_get_level()) {
+                ob_end_clean();
+            }
+            $pdf->Output('statement_' . date('Ymd') . '.pdf', 'D');
+            exit;
+        }
+    }
+
+    protected function emailTransactionPDF($transactions, $customer_id, $filters) {
+        // Load PHPMailer
+        require_once $_SERVER['DOCUMENT_ROOT'] . '/Evergreen/bank-system/evergreen-marketing/PHPMailer-7.0.0/src/Exception.php';
+        require_once $_SERVER['DOCUMENT_ROOT'] . '/Evergreen/bank-system/evergreen-marketing/PHPMailer-7.0.0/src/PHPMailer.php';
+        require_once $_SERVER['DOCUMENT_ROOT'] . '/Evergreen/bank-system/evergreen-marketing/PHPMailer-7.0.0/src/SMTP.php';
+
+        // Get customer's PRIMARY email
+        $customerEmail = null;
+        
+        // Always get the primary email from database to ensure accuracy
+        $this->db->query("
+            SELECT email FROM Emails 
+            WHERE customer_id = :customer_id AND is_active = 1 AND is_primary = 1
+            LIMIT 1
+        ");
+        $this->db->bind(':customer_id', $customer_id);
+        $emailResult = $this->db->single();
+        $customerEmail = $emailResult->email ?? null;
+        
+        // Fallback to any active email if no primary is set
+        if (!$customerEmail) {
+            $this->db->query("
+                SELECT email FROM Emails 
+                WHERE customer_id = :customer_id AND is_active = 1
+                ORDER BY created_at ASC 
+                LIMIT 1
+            ");
+            $this->db->bind(':customer_id', $customer_id);
+            $emailResult = $this->db->single();
+            $customerEmail = $emailResult->email ?? null;
+        }
+
+        if (!$customerEmail) {
+            $_SESSION['export_error'] = 'Unable to find your email address. Please update your profile.';
+            header('Location: ' . URLROOT . '/customer/transaction_history');
+            exit;
+        }
+
+        // Generate PDF content
+        $pdfContent = $this->generatePDF($transactions, true);
+        $filename = 'statement_' . date('Ymd_His') . '.pdf';
+
+        $customer_name = $_SESSION['customer_first_name'] . ' ' . $_SESSION['customer_last_name'];
+
+        // Send email
+        $mail = new PHPMailer(true);
+        
+        try {
+            $mail->isSMTP();
+            $mail->Host       = 'smtp.gmail.com';
+            $mail->SMTPAuth   = true;
+            $mail->Username   = 'evrgrn.64@gmail.com';
+            $mail->Password   = 'dourhhbymvjejuct';
+            $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+            $mail->Port       = 587;
+            
+            $mail->setFrom('evrgrn.64@gmail.com', 'Evergreen Banking');
+            $mail->addAddress($customerEmail, $customer_name);
+            
+            // Attach PDF
+            $mail->addStringAttachment($pdfContent, $filename, 'base64', 'application/pdf');
+            
+            $mail->isHTML(true);
+            $mail->Subject = 'Your Transaction History - Evergreen Bank';
+            $mail->Body    = '
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+                <div style="background: linear-gradient(135deg, #003631 0%, #1a6b62 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+                    <h1 style="color: white; margin: 0;">Transaction History</h1>
+                </div>
+                <div style="background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px;">
+                    <p style="font-size: 16px; color: #333;">Hello <strong>' . htmlspecialchars($customer_name) . '</strong>,</p>
+                    <p style="font-size: 14px; color: #666;">Your requested transaction history statement is attached to this email as a PDF file.</p>
+                    <div style="background: white; padding: 20px; margin: 20px 0; border-radius: 8px; border-left: 4px solid #003631;">
+                        <p style="margin: 0; color: #666;"><strong>Document:</strong> ' . htmlspecialchars($filename) . '</p>
+                        <p style="margin: 10px 0 0 0; color: #666;"><strong>Generated:</strong> ' . date('F d, Y \a\t h:i A') . '</p>
+                    </div>
+                    <p style="font-size: 13px; color: #666;">If you did not request this statement, please contact us immediately.</p>
+                    <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;">
+                    <p style="font-size: 12px; color: #999; text-align: center;">This is an automated message from Evergreen Bank. Please do not reply to this email.</p>
+                </div>
+            </div>
+            ';
+            
+            $mail->send();
+            $_SESSION['export_success'] = 'Your transaction history has been sent to ' . $customerEmail;
+            
+        } catch (Exception $e) {
+            $_SESSION['export_error'] = 'Failed to send email. Please try again later.';
+        }
+        
+        header('Location: ' . URLROOT . '/customer/transaction_history');
         exit;
     }
 
-
-    public function referral(){
-        if (!isset($_SESSION['customer_id'])) {
-            header('Location: ' . URLROOT . '/customer/login');
-            exit();
-        }
-
-        $customerId = $_SESSION['customer_id'];
-        
-        // Get referral code and stats
-        $referralData = $this->customerModel->getReferralCode($customerId);
-        $referralStats = $this->customerModel->getReferralStats($customerId);
-        
-        $data = [
-            'title' => 'Referral',
-            'first_name' => $_SESSION['customer_first_name'],
-            'last_name' => $_SESSION['customer_last_name'],
-            'referral_code' => $referralData ? $referralData->referral_code : 'Not Available',
-            'total_points' => $referralStats['total_points'],
-            'referral_count' => $referralStats['referral_count'],
-            'friend_code' => '',
-            'friend_code_error' => '',
-            'success_message' => '',
-            'error_message' => ''
-        ];
-
-        // Handle POST request (apply referral code)
-        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-            $_POST = filter_input_array(INPUT_POST, FILTER_SANITIZE_STRING);
-            
-            $friendCode = trim($_POST['friend_code'] ?? '');
-            $data['friend_code'] = $friendCode;
-
-            if (empty($friendCode)) {
-                $data['friend_code_error'] = 'Please enter a referral code';
-            } else {
-                $result = $this->customerModel->applyReferralCode($customerId, $friendCode);
-                
-                if ($result['success']) {
-                    $data['success_message'] = $result['message'];
-                    $data['friend_code'] = ''; // Clear the input
-                    
-                    // Refresh stats after successful referral
-                    $referralStats = $this->customerModel->getReferralStats($customerId);
-                    $data['total_points'] = $referralStats['total_points'];
-                    $data['referral_count'] = $referralStats['referral_count'];
-                } else {
-                    $data['error_message'] = $result['message'];
-                }
-            }
-        }
-
-        $this->view('customer/referral', $data);
-    }
 
     public function signup(){
         if (!isset($_SESSION['customer_id'])) {
@@ -1305,138 +1347,6 @@ class CustomerController extends Controller {
         ];
 
         $this->view('customer/signup', $data);
-    }
-
-    // -- LOANS --
-    public function pay_loan()
-    {
-        $customerId = $_SESSION['customer_id'];
-        $activeLoans = $this->customerModel->getActiveLoanApplications($customerId);
-        // Get Savings and Checking accounts only for payment
-        $accounts = $this->customerModel->getAccountsByCustomerId($customerId);
-        $paymentAccounts = array_filter($accounts, function($account) {
-            return in_array($account->account_type_id, [1, 2]); // Only Savings and Checking
-        });
-
-        $data = [
-            'title' => "Pay Loan",
-            'first_name' => $_SESSION['customer_first_name'] ?? 'Customer',
-            'active_loans' => $activeLoans,
-            'accounts' => $paymentAccounts,
-            'message' => ''
-        ];
-
-        // Process form submission
-        if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-            $this->processLoanPayment($data);
-        } else {
-            $this->view('customer/pay_loan', $data);
-        }
-    }
-
-    private function processLoanPayment(&$data)
-    {
-        $customerId = $_SESSION['customer_id'];
-
-        $applicationId = trim($_POST['loan_id'] ?? '');
-        $paymentAmount = (float)trim($_POST['payment_amount'] ?? 0);
-        $sourceAccount = trim($_POST['source_account'] ?? '');
-
-        $data['loan_id'] = $applicationId;
-        $data['payment_amount'] = $paymentAmount;
-        $data['source_account'] = $sourceAccount;
-        $data['loan_id_error'] = '';
-        $data['payment_amount_error'] = '';
-        $data['source_account_error'] = '';
-
-        // Validation
-        if (empty($applicationId)) {
-            $data['loan_id_error'] = 'Please select a loan application.';
-        }
-
-        if (empty($sourceAccount)) {
-            $data['source_account_error'] = 'Please select a payment account.';
-        }
-
-        if ($paymentAmount <= 0) {
-            $data['payment_amount_error'] = 'Please enter a valid payment amount.';
-        }
-
-        // Get loan details
-        $loanDetails = null;
-        if (!empty($applicationId)) {
-            foreach ($data['active_loans'] as $loan) {
-                if ($loan->application_id == $applicationId) {
-                    $loanDetails = $loan;
-                    break;
-                }
-            }
-            if (!$loanDetails) {
-                $data['loan_id_error'] = 'Invalid loan application selected.';
-            } elseif ($paymentAmount > $loanDetails->remaining_balance) {
-                $data['payment_amount_error'] = 'Payment amount cannot exceed remaining balance of ₱' . number_format($loanDetails->remaining_balance, 2);
-            }
-        }
-
-        // Check source account balance
-        if (!empty($sourceAccount)) {
-            $accountBalance = $this->customerModel->validateAmount($sourceAccount);
-            if ($accountBalance && $paymentAmount > (float)$accountBalance->balance) {
-                $data['source_account_error'] = 'Insufficient funds in selected account.';
-            }
-        }
-
-        // If no errors, show receipt confirmation
-        if (empty($data['loan_id_error']) && empty($data['payment_amount_error']) && empty($data['source_account_error'])) {
-            $data['loan_details'] = $loanDetails;
-            $data['customer_name'] = $_SESSION['customer_first_name'] . ' ' . $_SESSION['customer_last_name'];
-            $data['temp_transaction_ref'] = 'LP-PREVIEW-' . date('YmdHis') . '-' . strtoupper(bin2hex(random_bytes(3)));
-            
-            $this->view('customer/loan_receipt', $data);
-        } else {
-            $data['active_loans'] = $this->customerModel->getActiveLoanApplications($customerId);
-            $accounts = $this->customerModel->getAccountsByCustomerId($customerId);
-            $data['accounts'] = array_filter($accounts, function($account) {
-                return in_array($account->account_type_id, [1, 2]);
-            });
-            $this->view('customer/pay_loan', $data);
-        }
-    }
-
-    public function confirm_loan_payment()
-    {
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            header('Location: ' . URLROOT . '/customer/pay_loan');
-            exit();
-        }
-
-        $customerId = $_SESSION['customer_id'];
-        $applicationId = trim($_POST['loan_id'] ?? '');
-        $paymentAmount = (float)trim($_POST['payment_amount'] ?? 0);
-        $sourceAccount = trim($_POST['source_account'] ?? '');
-
-        // Re-validate before processing
-        if (empty($applicationId) || $paymentAmount <= 0 || empty($sourceAccount)) {
-            header('Location: ' . URLROOT . '/customer/pay_loan');
-            exit();
-        }
-
-        // Process the payment
-        $result = $this->customerModel->processApplicationPayment(
-            $applicationId,
-            $paymentAmount,
-            $sourceAccount,
-            $customerId
-        );
-
-        if ($result['status'] === true) {
-            $_SESSION['payment_success'] = 'Loan payment of ₱' . number_format($paymentAmount, 2) . ' processed successfully!';
-        } else {
-            $_SESSION['payment_error'] = $result['error'] ?? 'Payment failed. Please try again.';
-        }
-
-        header('Location: ' . URLROOT . '/customer/pay_loan');
-        exit();
     }
 
     /**

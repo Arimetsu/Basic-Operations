@@ -41,15 +41,16 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['verify_account'])) {
     } else {
         // Check if account exists and belongs to customer with this email
         $sql = "SELECT 
-                    bc.customer_id,
-                    bc.first_name,
-                    bc.email,
-                    bc.password_hash,
-                    ca.account_number
+                    c.customer_id,
+                    c.first_name,
+                    c.password_hash,
+                    a.account_number
                 FROM Customers c
                 INNER JOIN Accounts a ON c.customer_id = a.customer_id
-                WHERE ca.account_number = ? 
-                AND bc.email = ?
+                INNER JOIN Emails e ON c.customer_id = e.customer_id
+                WHERE a.account_number = ? 
+                AND e.email = ?
+                AND e.is_active = 1
                 LIMIT 1";
         $stmt = $conn->prepare($sql);
         $stmt->bind_param('ss', $account_number, $email);

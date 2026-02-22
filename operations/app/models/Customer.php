@@ -122,6 +122,7 @@ class Customer extends Database{
                     t.transaction_id,
                     t.transaction_ref,
                     t.amount,
+                    t.balance_after,
                     t.description,
                     tt.type_name AS transaction_type_name,
                     t.created_at
@@ -479,11 +480,53 @@ class Customer extends Database{
      */
     public function addCustomerEmail($customer_id, $email, $is_primary = 0) {
         try {
-            // Check if email already exists
-            $this->db->query("SELECT email_id FROM Emails WHERE email = :email AND is_active = 1");
+            // Check if email exists as inactive for THIS customer
+            $this->db->query("SELECT email_id FROM Emails WHERE email = :email AND customer_id = :customer_id AND is_active = 0");
             $this->db->bind(':email', $email);
+            $this->db->bind(':customer_id', $customer_id);
+            $inactiveRecord = $this->db->single();
+            
+            if ($inactiveRecord) {
+                // Reactivate the existing record for this customer
+                if ($is_primary == 1) {
+                    $this->db->query("UPDATE Emails SET is_primary = 0 WHERE customer_id = :customer_id AND is_active = 1");
+                    $this->db->bind(':customer_id', $customer_id);
+                    $this->db->execute();
+                }
+                
+                // Update without updated_at if column doesn't exist
+                $this->db->query("UPDATE Emails SET is_active = 1, is_primary = :is_primary 
+                                  WHERE email_id = :email_id");
+                $this->db->bind(':email_id', $inactiveRecord->email_id);
+                $this->db->bind(':is_primary', $is_primary);
+                $result = $this->db->execute();
+                
+                if ($result) {
+                    error_log("Email reactivated successfully for customer $customer_id: $email");
+                } else {
+                    error_log("Failed to reactivate email for customer $customer_id: $email");
+                }
+                
+                return $result;
+            }
+            
+            // Check if email already exists as active for ANY customer
+            $this->db->query("SELECT email_id, customer_id FROM Emails WHERE email = :email AND is_active = 1");
+            $this->db->bind(':email', $email);
+            $existingEmail = $this->db->single();
+            
+            if ($existingEmail) {
+                error_log("Email already exists as active for customer " . $existingEmail->customer_id . ": $email");
+                return false; // Email is already in use by this or another customer
+            }
+            
+            // Check if email exists as inactive for ANOTHER customer
+            $this->db->query("SELECT email_id FROM Emails WHERE email = :email AND customer_id != :customer_id AND is_active = 0");
+            $this->db->bind(':email', $email);
+            $this->db->bind(':customer_id', $customer_id);
             if ($this->db->single()) {
-                return false; // Email already exists
+                error_log("Email belongs to another customer (inactive): $email");
+                return false; // Email belongs to another customer (even if inactive)
             }
 
             // If setting as primary, unset other primary emails
@@ -500,9 +543,17 @@ class Customer extends Database{
             $this->db->bind(':email', $email);
             $this->db->bind(':is_primary', $is_primary);
             
-            return $this->db->execute();
+            $result = $this->db->execute();
+            
+            if ($result) {
+                error_log("New email added successfully for customer $customer_id: $email");
+            } else {
+                error_log("Failed to insert new email for customer $customer_id: $email");
+            }
+            
+            return $result;
         } catch (Exception $e) {
-            error_log("Error adding email: " . $e->getMessage());
+            error_log("Error adding email for customer $customer_id: " . $e->getMessage());
             return false;
         }
     }
@@ -516,6 +567,53 @@ class Customer extends Database{
      */
     public function addCustomerPhone($customer_id, $phone_number, $is_primary = 0) {
         try {
+            // Check if phone exists as inactive for THIS customer
+            $this->db->query("SELECT phone_id FROM Phones WHERE phone_number = :phone_number AND customer_id = :customer_id AND is_active = 0");
+            $this->db->bind(':phone_number', $phone_number);
+            $this->db->bind(':customer_id', $customer_id);
+            $inactiveRecord = $this->db->single();
+            
+            if ($inactiveRecord) {
+                // Reactivate the existing record for this customer
+                if ($is_primary == 1) {
+                    $this->db->query("UPDATE Phones SET is_primary = 0 WHERE customer_id = :customer_id AND is_active = 1");
+                    $this->db->bind(':customer_id', $customer_id);
+                    $this->db->execute();
+                }
+                
+                // Update without updated_at if column doesn't exist
+                $this->db->query("UPDATE Phones SET is_active = 1, is_primary = :is_primary 
+                                  WHERE phone_id = :phone_id");
+                $this->db->bind(':phone_id', $inactiveRecord->phone_id);
+                $this->db->bind(':is_primary', $is_primary);
+                $result = $this->db->execute();
+                
+                if ($result) {
+                    error_log("Phone reactivated successfully for customer $customer_id: $phone_number");
+                } else {
+                    error_log("Failed to reactivate phone for customer $customer_id: $phone_number");
+                }
+                
+                return $result;
+            }
+            
+            // Check if phone already exists as active for ANY customer
+            $this->db->query("SELECT phone_id FROM Phones WHERE phone_number = :phone_number AND is_active = 1");
+            $this->db->bind(':phone_number', $phone_number);
+            if ($this->db->single()) {
+                error_log("Phone already exists as active: $phone_number");
+                return false; // Phone is already in use
+            }
+            
+            // Check if phone exists as inactive for ANOTHER customer
+            $this->db->query("SELECT phone_id FROM Phones WHERE phone_number = :phone_number AND customer_id != :customer_id AND is_active = 0");
+            $this->db->bind(':phone_number', $phone_number);
+            $this->db->bind(':customer_id', $customer_id);
+            if ($this->db->single()) {
+                error_log("Phone belongs to another customer (inactive): $phone_number");
+                return false; // Phone belongs to another customer (even if inactive)
+            }
+
             // If setting as primary, unset other primary phones
             if ($is_primary == 1) {
                 $this->db->query("UPDATE Phones SET is_primary = 0 WHERE customer_id = :customer_id");
@@ -530,9 +628,17 @@ class Customer extends Database{
             $this->db->bind(':phone_number', $phone_number);
             $this->db->bind(':is_primary', $is_primary);
             
-            return $this->db->execute();
+            $result = $this->db->execute();
+            
+            if ($result) {
+                error_log("New phone added successfully for customer $customer_id: $phone_number");
+            } else {
+                error_log("Failed to insert new phone for customer $customer_id: $phone_number");
+            }
+            
+            return $result;
         } catch (Exception $e) {
-            error_log("Error adding phone: " . $e->getMessage());
+            error_log("Error adding phone for customer $customer_id: " . $e->getMessage());
             return false;
         }
     }
@@ -670,23 +776,21 @@ class Customer extends Database{
 
         $transaction_ref = 'SF-' . date('YmdHis') . '-' . strtoupper(bin2hex(random_bytes(3)));
 
+        // Get current balance BEFORE inserting transaction
+        $balance_before = $this->getAccountBalance($account_id);
+        $balance_after = $balance_before - $fee_amount; // Service charge reduces balance
+
         // Insert Transaction record for the fee (debit)
-        $this->db->query("INSERT INTO Transaction (transaction_ref, account_id, transaction_type_id, amount, description, created_at) VALUES (:transaction_ref, :account_id, :type_id, :amount, :description, NOW())");
+        $this->db->query("INSERT INTO Transaction (transaction_ref, account_id, transaction_type_id, amount, balance_after, description, created_at) VALUES (:transaction_ref, :account_id, :type_id, :amount, :balance_after, :description, NOW())");
         $this->db->bind(':transaction_ref', $transaction_ref);
         $this->db->bind(':account_id', $account_id);
         $this->db->bind(':type_id', $transactionTypeId);
         $this->db->bind(':amount', $fee_amount);
+        $this->db->bind(':balance_after', $balance_after);
         $this->db->bind(':description', 'Service Charge - ' . $transaction_ref);
         $this->db->execute();
 
         $transaction_id = $this->db->lastInsertId();
-
-        // Get balance before and after
-        $this->db->query("SELECT COALESCE(SUM(CASE tt.type_name WHEN 'Deposit' THEN t.amount WHEN 'Transfer In' THEN t.amount WHEN 'Interest Payment' THEN t.amount WHEN 'Loan Disbursement' THEN t.amount WHEN 'Withdrawal' THEN -t.amount WHEN 'Transfer Out' THEN -t.amount WHEN 'Service Charge' THEN -t.amount ELSE 0 END),0) AS balance FROM Transaction t LEFT JOIN Transaction_Type tt ON t.transaction_type_id = tt.transaction_type_id WHERE t.account_id = :account_id");
-        $this->db->bind(':account_id', $account_id);
-        $row = $this->db->single();
-        $balance_after = $row ? (float)$row->balance : 0.00;
-        $balance_before = $balance_after + $fee_amount;
 
         // Insert into service_fee_charges
         $this->db->query("INSERT INTO service_fee_charges (account_id, transaction_id, fee_amount, balance_before, balance_after, charge_date, fee_type, created_at) VALUES (:account_id, :transaction_id, :fee_amount, :balance_before, :balance_after, CURDATE(), :fee_type, NOW())");
@@ -1085,7 +1189,14 @@ class Customer extends Database{
     }
 
     public function recordTransaction($transaction_ref, $sender, $receiver, $amount, $fee, $message){
-        // for sender
+        // Get sender's current balance
+        $senderCurrentBalance = $this->getAccountBalance($sender);
+        
+        // Get receiver's current balance
+        $receiverCurrentBalance = $this->getAccountBalance($receiver);
+        
+        // for sender (Transfer Out - subtract amount)
+        $senderBalanceAfter = $senderCurrentBalance - $amount;
         $this->db->query("
         INSERT INTO Transaction (
             transaction_ref,
@@ -1093,6 +1204,7 @@ class Customer extends Database{
             transaction_type_id,
             amount,
             related_account_id,
+            balance_after,
             description
         )
         VALUES (
@@ -1101,6 +1213,7 @@ class Customer extends Database{
             :transaction_type,
             :amount,
             :receiver,
+            :balance_after,
             :message
         );
         ");
@@ -1109,39 +1222,46 @@ class Customer extends Database{
         $this->db->bind(':transaction_type', 8);
         $this->db->bind(':amount', $amount);
         $this->db->bind(':receiver', $receiver);
+        $this->db->bind(':balance_after', $senderBalanceAfter);
         $this->db->bind(':message', $message);
         $this->db->execute();
 
         // For the fee (only if fee is greater than 0)
         if ($fee > 0) {
+            $senderBalanceAfter = $senderBalanceAfter - $fee; // Subtract fee from balance
             $this->db->query("
             INSERT INTO Transaction (
                 account_id,
                 transaction_type_id,
                 amount,
+                balance_after,
                 description
             )
             VALUES (
                 :sender,
                 :transaction_type,
                 :amount,
+                :balance_after,
                 :message
             );
             ");
             $this->db->bind(':sender', $sender);
             $this->db->bind(':transaction_type', 5);
             $this->db->bind(':amount', $fee);
+            $this->db->bind(':balance_after', $senderBalanceAfter);
             $this->db->bind(':message', 'Transaction Service Charge - ' . $transaction_ref);
             $this->db->execute();
         }
 
-        // for the receiver
+        // for the receiver (Transfer In - add amount)
+        $receiverBalanceAfter = $receiverCurrentBalance + $amount;
         $this->db->query("
         INSERT INTO Transaction (
             account_id,
             transaction_type_id,
             amount,
             related_account_id,
+            balance_after,
             description
         )
         VALUES (
@@ -1149,6 +1269,7 @@ class Customer extends Database{
             :transaction_type,
             :amount,
             :receiver,
+            :balance_after,
             :message
         );
         ");
@@ -1156,18 +1277,24 @@ class Customer extends Database{
         $this->db->bind(':transaction_type', 9);
         $this->db->bind(':amount', $amount);
         $this->db->bind(':receiver', $sender);
+        $this->db->bind(':balance_after', $receiverBalanceAfter);
         $this->db->bind(':message', $message);
         $this->db->execute();
     }
 
     public function recordDummyTransfer($transaction_ref, $sender, $amount, $fee, $message){
+        // Get sender's current balance
+        $senderCurrentBalance = $this->getAccountBalance($sender);
+        
         // for sender (debit only - no receiver credit for external transfer)
+        $senderBalanceAfter = $senderCurrentBalance - $amount;
         $this->db->query("
         INSERT INTO Transaction (
             transaction_ref,
             account_id,
             transaction_type_id,
             amount,
+            balance_after,
             description
         )
         VALUES (
@@ -1175,6 +1302,7 @@ class Customer extends Database{
             :sender,
             :transaction_type,
             :amount,
+            :balance_after,
             :message
         );
         ");
@@ -1182,28 +1310,33 @@ class Customer extends Database{
         $this->db->bind(':sender', $sender);
         $this->db->bind(':transaction_type', 8);
         $this->db->bind(':amount', $amount);
+        $this->db->bind(':balance_after', $senderBalanceAfter);
         $this->db->bind(':message', $message);
         $this->db->execute();
 
         // For the fee (only if fee is greater than 0)
         if ($fee > 0) {
+            $senderBalanceAfter = $senderBalanceAfter - $fee; // Subtract fee
             $this->db->query("
             INSERT INTO Transaction (
                 account_id,
                 transaction_type_id,
                 amount,
+                balance_after,
                 description
             )
             VALUES (
                 :sender,
                 :transaction_type,
                 :amount,
+                :balance_after,
                 :message
             );
             ");
             $this->db->bind(':sender', $sender);
             $this->db->bind(':transaction_type', 5);
             $this->db->bind(':amount', $fee);
+            $this->db->bind(':balance_after', $senderBalanceAfter);
             $this->db->bind(':message', 'Transaction Service Charge - ' . $transaction_ref);
             $this->db->execute();
         }
@@ -1509,12 +1642,17 @@ class Customer extends Database{
             $transactionRef = uniqid('LP-'); // Prefix for clarity
             $description = "Loan Payment - Ref: {$transactionRef}, Application ID: {$applicationId}, From: {$sourceAccountNumber}";
 
+            // Get current balance BEFORE the payment
+            $currentBalance = $this->getAccountBalance($sourceAccountId);
+            $balance_after = $currentBalance - $paymentAmount; // Loan payment reduces balance
+
             $this->db->query("
                 INSERT INTO Transaction (
                     transaction_ref,
                     account_id,
                     transaction_type_id,
                     amount,
+                    balance_after,
                     description,
                     created_at
                 )
@@ -1523,6 +1661,7 @@ class Customer extends Database{
                     :account_id,
                     :type_id,
                     :amount,
+                    :balance_after,
                     :description,
                     NOW()
                 )
@@ -1531,6 +1670,7 @@ class Customer extends Database{
             $this->db->bind(':account_id', $sourceAccountId);
             $this->db->bind(':type_id', $transactionTypeId);
             $this->db->bind(':amount', $paymentAmount); // Positive for raw amount; signed logic handles debit
+            $this->db->bind(':balance_after', $balance_after);
             $this->db->bind(':description', $description);
 
             if (!$this->db->execute()) {
@@ -1794,17 +1934,21 @@ class Customer extends Database{
                 // Record interest payment transaction
                 $transaction_ref = 'INT-' . date('YmdHis') . '-' . $account->account_id;
                 
+                // Calculate balance_after (interest payment increases balance)
+                $balance_after = $balance + $interest_amount;
+                
                 $this->db->query("
                     INSERT INTO Transaction 
-                        (transaction_ref, account_id, transaction_type_id, amount, description, created_at)
+                        (transaction_ref, account_id, transaction_type_id, amount, balance_after, description, created_at)
                     VALUES 
-                        (:transaction_ref, :account_id, :transaction_type_id, :amount, :description, NOW())
+                        (:transaction_ref, :account_id, :transaction_type_id, :amount, :balance_after, :description, NOW())
                 ");
                 
                 $this->db->bind(':transaction_ref', $transaction_ref);
                 $this->db->bind(':account_id', $account->account_id);
                 $this->db->bind(':transaction_type_id', $interest_type_id);
                 $this->db->bind(':amount', $interest_amount);
+                $this->db->bind(':balance_after', $balance_after);
                 $this->db->bind(':description', 'Monthly interest payment - ' . date('F Y'));
                 
                 if ($this->db->execute()) {
@@ -2235,11 +2379,11 @@ class Customer extends Database{
             $this->db->query("
                 INSERT INTO Customer_Profile (
                     customer_id, gender_id, date_of_birth, marital_status, occupation,
-                    employment_status, company_name, income_range, nationality, is_active, created_at
+                    employment_status, company_name, income_range, nationality, created_at
                 )
                 VALUES (
                     :customer_id, :gender_id, :date_of_birth, :marital_status, :occupation,
-                    :employment_status, :company_name, :income_range, :nationality, 1, NOW()
+                    :employment_status, :company_name, :income_range, :nationality, NOW()
                 )
             ");
             $this->db->bind(':customer_id', $customer_id);

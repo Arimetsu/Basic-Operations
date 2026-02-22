@@ -1,5 +1,8 @@
 <?php
 
+use PHPMailer\PHPMailer\PHPMailer;
+use PHPMailer\PHPMailer\Exception;
+
 class AuthController extends Controller{
   private $customerModel;
 
@@ -307,13 +310,13 @@ class AuthController extends Controller{
           }
         }
 
-        // Register the customer
+        // Register the customer directly without OTP verification
         $result = $this->customerModel->registerCustomer($data, $uploadedFiles);
-
+        
         if($result['success']) {
           // Set success message in session
           $_SESSION['signup_success'] = 'Registration successful! Your application is pending review. You will receive an email once approved.';
-          header('Location: ' .URLROOT. '/auth/login');
+          header('Location: ' . URLROOT . '/auth/login');
           exit;
         } else {
           $data['error'] = $result['error'] ?? 'Registration failed. Please try again.';
@@ -324,5 +327,56 @@ class AuthController extends Controller{
     }
 
     $this->view('auth/signup', $data);
+  }
+
+  public function verify_signup() {
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
+    
+    // Redirect if no pending signup
+    if (!isset($_SESSION['signup_otp']) || !isset($_SESSION['pending_signup_data'])) {
+        header('Location: ' . URLROOT . '/auth/signup');
+        exit;
+    }
+    
+    $this->view('auth/signup_verify');
+  }
+
+  public function complete_signup() {
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
+    
+    // Redirect if OTP not verified or no pending signup
+    if (!isset($_SESSION['signup_otp_verified']) || !isset($_SESSION['pending_signup_data'])) {
+        header('Location: ' . URLROOT . '/auth/signup');
+        exit;
+    }
+    
+    // Get signup data from session
+    $data = $_SESSION['pending_signup_data'];
+    $uploadedFiles = $_SESSION['pending_uploaded_files'] ?? [];
+    
+    // Register the customer
+    $result = $this->customerModel->registerCustomer($data, $uploadedFiles);
+    
+    // Clear signup session data
+    unset($_SESSION['signup_otp']);
+    unset($_SESSION['pending_signup_data']);
+    unset($_SESSION['pending_uploaded_files']);
+    unset($_SESSION['otp_signup_time']);
+    unset($_SESSION['signup_otp_verified']);
+    
+    if($result['success']) {
+      // Set success message in session
+      $_SESSION['signup_success'] = 'Registration successful! Your email has been verified. Your application is pending review. You will receive an email once approved.';
+      header('Location: ' . URLROOT . '/auth/login');
+      exit;
+    } else {
+      $_SESSION['error'] = $result['error'] ?? 'Registration failed. Please try again.';
+      header('Location: ' . URLROOT . '/auth/signup');
+      exit;
+    }
   }
 }

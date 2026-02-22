@@ -575,9 +575,9 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Auto-dismiss alerts
+    // Auto-dismiss error alerts only (not modal alerts)
     setTimeout(() => {
-        const alerts = document.querySelectorAll('.alert');
+        const alerts = document.querySelectorAll('.alert-danger, .alert-dismissible');
         alerts.forEach(alert => {
             alert.style.transition = 'opacity 0.5s ease';
             alert.style.opacity = '0';

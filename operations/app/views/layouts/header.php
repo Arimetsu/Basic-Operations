@@ -28,9 +28,6 @@
         <div class="collapse navbar-collapse" id="navbarNav">
             <?php if((isset($_SESSION['customer_id']))): ?>
             <ul class="navbar-nav mx-auto">
-                <li class="nav-item me-2">
-                    <a class="nav-link" href="/Evergreen/bank-system/evergreen-marketing/viewingpage.php">Home</a>
-                </li>
                 <li class="nav-item mx-2">
                     <a class="nav-link <?= (!empty($data['title']) && $data['title'] == 'Accounts') ? 'active text-warning' : ''; ?>" 
                     href="<?= URLROOT ?>/customer/account">Accounts</a>
@@ -42,14 +39,6 @@
                 <li class="nav-item mx-2">
                     <a class="nav-link <?= (!empty($data['title']) && $data['title'] == 'Transaction History') ? 'active text-warning' : ''; ?>" 
                     href="<?= URLROOT ?>/customer/transaction_history">Transaction History</a>
-                </li>
-                <li class="nav-item mx-2">
-                    <a class="nav-link <?= (!empty($data['title']) && $data['title'] == 'Referral') ? 'active text-warning' : ''; ?>" 
-                    href="<?= URLROOT ?>/customer/referral">Referral</a>
-                </li>
-                <li class="nav-item mx-2">
-                    <a class="nav-link <?= (!empty($data['title']) && $data['title'] == 'Pay Loan') ? 'active text-warning' : ''; ?>" 
-                    href="<?= URLROOT ?>/customer/pay_loan">Pay Loan</a>
                 </li>
                 <li class="nav-item mx-2">
                     <a class="nav-link <?= (!empty($data['title']) && $data['title'] == 'Account Applications') ? 'active text-warning' : ''; ?>" 
