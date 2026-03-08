@@ -287,6 +287,15 @@ require_once ROOT_PATH . '/app/views/layouts/header.php';
                                             <span class="info-value small"><?= htmlspecialchars($app['reviewed_at']) ?></span>
                                         </div>
                                     <?php endif; ?>
+                                    
+                                    <?php if (strtolower($app['application_status']) === 'rejected' && !empty($app['rejection_reason'])): ?>
+                                        <div class="mt-3 p-3" style="background: #f8d7da; border-radius: 8px; border-left: 4px solid #dc3545;">
+                                            <span class="info-label d-block mb-2" style="color: #842029;">
+                                                <i class="bi bi-exclamation-triangle-fill me-1"></i>Rejection Reason
+                                            </span>
+                                            <span class="text-danger" style="font-size: 0.95rem;"><?= htmlspecialchars($app['rejection_reason']) ?></span>
+                                        </div>
+                                    <?php endif; ?>
                                 </div>
                             </div>
 

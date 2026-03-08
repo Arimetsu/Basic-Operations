@@ -130,9 +130,17 @@ async function loadApplications() {
     }
 
     const result = await response.json();
+    
+    console.log("API Response:", result); // Debug log
 
     if (result.success) {
       allApplications = result.applications || [];
+      
+      console.log(`Loaded ${allApplications.length} applications`); // Debug log
+      if (allApplications.length > 0) {
+        console.log("First application:", allApplications[0]); // Debug log
+      }
+      
       updateStats();
       displayApplications(allApplications);
     } else {
@@ -154,16 +162,16 @@ function updateStats() {
 
   const stats = {
     pending: allApplications.filter(
-      (app) => app.application_status === "pending"
+      (app) => app.application_status?.toLowerCase() === "pending"
     ).length,
     approved: allApplications.filter(
       (app) =>
-        app.application_status === "approved" &&
+        app.application_status?.toLowerCase() === "approved" &&
         app.submitted_at?.startsWith(today)
     ).length,
     rejected: allApplications.filter(
       (app) =>
-        app.application_status === "rejected" &&
+        app.application_status?.toLowerCase() === "rejected" &&
         app.submitted_at?.startsWith(today)
     ).length,
     total: allApplications.length,
@@ -246,7 +254,7 @@ function displayEmptyState(message) {
  */
 function filterApplications() {
   const searchTerm = document.getElementById("searchInput").value.toLowerCase();
-  const statusFilter = document.getElementById("filterStatus").value;
+  const statusFilter = document.getElementById("filterStatus").value.toLowerCase();
   const accountTypeFilter = document.getElementById("filterAccountType").value;
 
   const filtered = allApplications.filter((app) => {
@@ -259,7 +267,7 @@ function filterApplications() {
       app.email?.toLowerCase().includes(searchTerm);
 
     const matchesStatus =
-      !statusFilter || app.application_status === statusFilter;
+      !statusFilter || app.application_status?.toLowerCase() === statusFilter;
     const matchesAccountType =
       !accountTypeFilter || app.account_type === accountTypeFilter;
 
@@ -299,8 +307,11 @@ async function viewApplicationDetails(applicationId) {
     }
 
     const result = await response.json();
+    
+    console.log("Application details response:", result);
 
     if (result.success) {
+      console.log("Application data:", result.application);
       displayApplicationDetails(result.application);
       applicationModal.show();
     } else {
@@ -316,9 +327,21 @@ async function viewApplicationDetails(applicationId) {
  * Display application details in modal
  */
 function displayApplicationDetails(app) {
+  console.log('=== Displaying Application Details ===');
+  console.log('Full app object:', app);
+  console.log('Application Status:', app.application_status);
+  console.log('Account Type:', app.account_type);
+  console.log('Employment Status:', app.employment_status);
+  console.log('Employer Name:', app.employer_name);
+  console.log('Occupation:', app.occupation);
+  
   const detailsContainer = document.getElementById("applicationDetails");
-  // Explicit base paths (avoid /public in URLs)
-  const rootBase = `${window.location.origin}/Evergreen/bank-system/Basic-operation`;
+  // Compute project root from /public path
+  const currentPath = window.location.pathname;
+  const rootPath = currentPath.includes("/public/")
+    ? currentPath.substring(0, currentPath.indexOf("/public/"))
+    : "/basic-operation";
+  const rootBase = `${window.location.origin}${rootPath}`;
   const uploadsBase = `${rootBase}/uploads`;
 
   // Resolve ID images: prefer application_documents if provided
@@ -492,9 +515,7 @@ function displayApplicationDetails(app) {
       <div class="detail-row">
         <div class="detail-item">
           <span class="detail-label">Application Status</span>
-          <span class="detail-value">${getStatusBadge(
-            app.application_status
-          )}</span>
+          <span class="detail-value">${getStatusBadge(app.application_status)}</span>
         </div>
         <div class="detail-item">
           <span class="detail-label">Submitted Date</span>
@@ -717,14 +738,30 @@ async function handleReject() {
  * Get status badge HTML
  */
 function getStatusBadge(status) {
+  if (!status) {
+    console.warn('Status is empty or undefined:', status);
+    return '<span class="badge badge-secondary">Unknown</span>';
+  }
+  
+  // Trim whitespace and convert to lowercase, replace spaces with underscores
+  const statusLower = status.toString().trim().toLowerCase().replace(/\s+/g, '_');
+  
+  console.log('Processing status:', status, '-> lowercase:', statusLower);
+  
   const statusMap = {
     pending: '<span class="badge badge-pending">Pending</span>',
+    under_review: '<span class="badge badge-under-review">Under Review</span>',
     approved: '<span class="badge badge-approved">Approved</span>',
     rejected: '<span class="badge badge-rejected">Rejected</span>',
+    cancelled: '<span class="badge badge-cancelled">Cancelled</span>',
   };
-  return (
-    statusMap[status] || '<span class="badge badge-secondary">Unknown</span>'
-  );
+  
+  const badge = statusMap[statusLower];
+  if (!badge) {
+    console.warn('No badge found for status:', statusLower, 'Available:', Object.keys(statusMap));
+  }
+  
+  return badge || '<span class="badge badge-secondary">Unknown</span>';
 }
 
 /**

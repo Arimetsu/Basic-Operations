@@ -432,20 +432,59 @@
               <!-- Financial Details Section -->
               <div class="section-title">Financial Details</div>
 
+              <!-- Account Details -->
               <div class="form-row">
                 <div class="form-group">
                   <label>Account Type <span style="color: red">*</span></label>
-                  <select name="account_type" class="form-control" required>
+                  <select name="account_type" id="account_type" class="form-control" required>
                     <option value="">Select Account Type</option>
-                    <option value="Savings Account">Savings Account</option>
-                    <option value="Checking Account">Checking Account</option>
                   </select>
+                  <input type="hidden" name="account_type_id" id="account_type_id" />
                   <div class="error-message" id="error-account_type"></div>
                 </div>
                 <div class="form-group">
-                  <label
-                    >Source of Funds <span style="color: red">*</span></label
-                  >
+                  <label>Services</label>
+                  <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 8px;">
+                    <div class="form-check">
+                      <input
+                        class="form-check-input"
+                        type="checkbox"
+                        name="wants_passbook"
+                        id="wants_passbook"
+                        value="1"
+                        checked
+                      />
+                      <label class="form-check-label" for="wants_passbook">
+                        <strong>Passbook</strong>
+                        <small class="d-block text-muted" style="font-size: 11px">
+                          Physical record of transactions
+                        </small>
+                      </label>
+                    </div>
+                    <div class="form-check">
+                      <input
+                        class="form-check-input"
+                        type="checkbox"
+                        name="wants_atm_card"
+                        id="wants_atm_card"
+                        value="1"
+                        checked
+                      />
+                      <label class="form-check-label" for="wants_atm_card">
+                        <strong>ATM/Debit Card</strong>
+                        <small class="d-block text-muted" style="font-size: 11px">
+                          Access account via ATM
+                        </small>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Financial Information -->
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Source of Funds <span style="color: red">*</span></label>
                   <select
                     id="source_of_funds"
                     name="source_of_funds"
@@ -457,9 +496,7 @@
                   <div class="error-message" id="error-source_of_funds"></div>
                 </div>
                 <div class="form-group">
-                  <label
-                    >Employment Status <span style="color: red">*</span></label
-                  >
+                  <label>Employment Status <span style="color: red">*</span></label>
                   <select
                     id="employment_status"
                     name="employment_status"
@@ -470,6 +507,10 @@
                   </select>
                   <div class="error-message" id="error-employment_status"></div>
                 </div>
+              </div>
+
+              <!-- Employment Details -->
+              <div class="form-row">
                 <div class="form-group">
                   <label>Name of Employer</label>
                   <input
@@ -488,28 +529,32 @@
                     placeholder="e.g., Manager, Engineer"
                   />
                 </div>
+              </div>
+
+              <div class="form-row">
                 <div class="form-group form-group-large">
                   <label>Employer Address</label>
                   <input
                     type="text"
                     name="employer_address"
                     class="form-control"
-                    placeholder="123 Bldg. Metro Manila"
+                    placeholder="123 Main Street, Metro Manila"
                   />
                 </div>
-                <div class="form-group">
-                  <label>Annual Income</label>
-                  <input
-                    type="number"
-                    name="annual_income"
-                    class="form-control"
-                    placeholder="0.00"
-                    step="0.01"
-                    min="0"
-                  />
-                  <small style="color: #666; font-size: 11px">
-                    Enter your estimated annual income in PHP
-                  </small>
+              </div>
+
+              <div class="form-row">
+                <div class="form-group form-group-large">
+                  <label>Annual Income Range <span style="color: red">*</span></label>
+                  <select name="income_range" class="form-control" required>
+                    <option value="">Select Income Range</option>
+                    <option value="Below 100,000">Below ₱100,000</option>
+                    <option value="100,000 - 250,000">₱100,000 - ₱250,000</option>
+                    <option value="250,000 - 500,000">₱250,000 - ₱500,000</option>
+                    <option value="500,000 - 1,000,000">₱500,000 - ₱1,000,000</option>
+                    <option value="Above 1,000,000">Above ₱1,000,000</option>
+                  </select>
+                  <div class="error-message" id="error-income_range"></div>
                 </div>
               </div>
 
@@ -565,18 +610,21 @@
       console.log("API Base URL:", API_BASE_URL);
 
       let countryCodes = [];
+      let accountTypesData = {};
       let emailCount = 1;
       let phoneCount = 1;
 
       // Load country codes on page load
       document.addEventListener("DOMContentLoaded", async function () {
         await loadCountryCodes();
+        await loadAccountTypes(); // Load account types from database
         await loadProvinces(); // Load provinces on page load
         await loadAllCitiesForBirthplace(); // Load all cities for place of birth
         await loadEmploymentStatuses(); // Load employment statuses from database
         await loadSourceOfFunds(); // Load source of funds from database
         setupFormHandlers();
         setupLocationHandlers(); // Setup cascading dropdowns
+        setupAccountTypeHandler(); // Setup account type change handler
         restoreFormData(); // Restore data if coming back from step 2
       });
 
@@ -831,6 +879,117 @@
         } catch (error) {
           console.error("Error loading source of funds:", error);
         }
+      }
+
+      // Load account types from database
+      async function loadAccountTypes() {
+        try {
+          const apiUrl = `${API_BASE_URL}/common/get-account-types.php`;
+          console.log("Loading account types from:", apiUrl);
+
+          const response = await fetch(apiUrl);
+
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+
+          const result = await response.json();
+          console.log("Account types result:", result);
+
+          if (result.success && result.account_types) {
+            // Store account types by type_name for easy lookup
+            result.account_types.forEach(type => {
+              accountTypesData[type.type_name] = type;
+            });
+
+            // Populate account type dropdown
+            const accountTypeSelect = document.getElementById("account_type");
+            const options = result.account_types
+              .filter(type => type.type_name === 'Savings' || type.type_name === 'Current')
+              .map(type => {
+                const displayName = type.type_name === 'Current' ? 'Checking Account' : type.type_name + ' Account';
+                return `<option value="${type.type_name}" data-type-id="${type.account_type_id}">${displayName}</option>`;
+              })
+              .join("");
+
+            accountTypeSelect.innerHTML =
+              '<option value="">Select Account Type</option>' + options;
+            console.log("Loaded", result.account_types.length, "account types");
+          } else {
+            console.error("Failed to load account types:", result.message);
+          }
+        } catch (error) {
+          console.error("Error loading account types:", error);
+        }
+      }
+
+      // Setup account type change handler
+      function setupAccountTypeHandler() {
+        const accountTypeSelect = document.getElementById("account_type");
+        const passbookCheckbox = document.getElementById("wants_passbook");
+        const atmCheckbox = document.getElementById("wants_atm_card");
+        const accountTypeIdInput = document.getElementById("account_type_id");
+
+        if (!accountTypeSelect || !passbookCheckbox || !atmCheckbox) {
+          console.warn("Account type or checkbox elements not found");
+          return;
+        }
+
+        accountTypeSelect.addEventListener("change", function() {
+          const selectedTypeName = this.value;
+          const selectedOption = this.options[this.selectedIndex];
+          const accountTypeId = selectedOption.getAttribute("data-type-id");
+
+          // Set the hidden account_type_id field
+          if (accountTypeIdInput && accountTypeId) {
+            accountTypeIdInput.value = accountTypeId;
+          }
+
+          if (!selectedTypeName) {
+            // Reset checkboxes if no selection
+            passbookCheckbox.disabled = false;
+            passbookCheckbox.checked = true;
+            passbookCheckbox.parentElement.style.opacity = "1";
+            atmCheckbox.disabled = false;
+            atmCheckbox.checked = true;
+            atmCheckbox.parentElement.style.opacity = "1";
+            return;
+          }
+
+          const accountType = accountTypesData[selectedTypeName];
+
+          console.log("Selected account type:", selectedTypeName, accountType);
+
+          if (accountType) {
+            // Set passbook based on allows_passbook flag
+            if (accountType.allows_passbook) {
+              passbookCheckbox.disabled = false;
+              passbookCheckbox.checked = true;
+              passbookCheckbox.parentElement.style.opacity = "1";
+              console.log("Passbook enabled");
+            } else {
+              passbookCheckbox.disabled = true;
+              passbookCheckbox.checked = false;
+              passbookCheckbox.parentElement.style.opacity = "0.5";
+              console.log("Passbook disabled");
+            }
+
+            // Set ATM card based on allows_atm_card flag
+            if (accountType.allows_atm_card) {
+              atmCheckbox.disabled = false;
+              atmCheckbox.checked = true;
+              atmCheckbox.parentElement.style.opacity = "1";
+              console.log("ATM card enabled");
+            } else {
+              atmCheckbox.disabled = true;
+              atmCheckbox.checked = false;
+              atmCheckbox.parentElement.style.opacity = "0.5";
+              console.log("ATM card disabled");
+            }
+          } else {
+            console.warn("Account type not found in data:", selectedTypeName);
+          }
+        });
       }
 
       // ========================================
@@ -1467,6 +1626,15 @@
         console.log("  - employment_status:", data.employment_status);
         console.log("  - source_of_funds:", data.source_of_funds);
         console.log("  - job_title:", data.job_title);
+        console.log("  - account_type:", data.account_type);
+        console.log("  - account_type_id:", data.account_type_id);
+
+        // Handle checkboxes explicitly (FormData doesn't include unchecked boxes)
+        data.wants_passbook = document.getElementById("wants_passbook")?.checked ? 1 : 0;
+        data.wants_atm_card = document.getElementById("wants_atm_card")?.checked ? 1 : 0;
+
+        console.log("  - wants_passbook:", data.wants_passbook);
+        console.log("  - wants_atm_card:", data.wants_atm_card);
 
         return data;
       }

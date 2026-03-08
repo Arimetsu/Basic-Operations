@@ -39,7 +39,8 @@ let webcamStream = null;
 let selfieCaptured = false;
 
 // Initialize on page load
-document.addEventListener("DOMContentLoaded", function () {
+document.addEventListener("DOMContentLoaded", async function () {
+  await loadIdTypes();
   setupFormHandlers();
   setupFileUploadHandlers();
   setupSignaturePad();
@@ -55,6 +56,62 @@ function checkSessionData() {
   if (!urlParams.has("from") && !sessionStorage.getItem("step1_completed")) {
     // Optionally redirect to step 1
     // window.location.href = 'customer-onboarding-details.html';
+  }
+}
+
+/**
+ * Load ID types from database
+ */
+async function loadIdTypes() {
+  const idTypeSelect = document.getElementById("id_type");
+  if (!idTypeSelect) return;
+
+  try {
+    const candidateUrls = [
+      `${API_BASE_URL}/common/get-id-types.php`,
+      "../api/common/get-id-types.php",
+      "/basic-operation/api/common/get-id-types.php",
+    ];
+
+    let result = null;
+    let lastError = null;
+
+    for (const url of candidateUrls) {
+      try {
+        const response = await fetch(url);
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        const parsed = await response.json();
+        if (parsed.success && Array.isArray(parsed.data)) {
+          result = parsed;
+          break;
+        }
+        throw new Error(parsed.message || "Invalid ID types response");
+      } catch (err) {
+        lastError = err;
+      }
+    }
+
+    if (!result) {
+      throw lastError || new Error("Unable to load ID types");
+    }
+
+    if (!result.success || !Array.isArray(result.data)) {
+      throw new Error(result.message || "Invalid ID types response");
+    }
+
+    const options = result.data
+      .map(
+        (idType) =>
+          `<option value="${idType.id_type_id}" data-type-name="${idType.type_name}">${idType.type_name}</option>`,
+      )
+      .join("");
+
+    idTypeSelect.innerHTML = `<option value="">Select ID Type</option>${options}`;
+  } catch (error) {
+    console.error("Failed to load ID types:", error);
+    idTypeSelect.innerHTML = `<option value="">Select ID Type</option>`;
   }
 }
 
@@ -281,12 +338,20 @@ async function handleFormSubmit(e) {
     }
 
     // Add form fields
-    const idType = document.getElementById("id_type").value;
+    const idTypeSelect = document.getElementById("id_type");
+    const idTypeId = idTypeSelect ? idTypeSelect.value : "";
+    const idType = idTypeSelect
+      ? idTypeSelect.options[idTypeSelect.selectedIndex]?.dataset.typeName ||
+        idTypeSelect.options[idTypeSelect.selectedIndex]?.text ||
+        ""
+      : "";
     const idNumber = document.getElementById("id_number").value;
 
+    console.log("🔍 Step 2 - idTypeId value:", idTypeId);
     console.log("🔍 Step 2 - idType value:", idType);
     console.log("🔍 Step 2 - idNumber value:", idNumber);
 
+    formData.append("id_type_id", idTypeId);
     formData.append("id_type", idType);
     formData.append("id_number", idNumber);
 
@@ -308,6 +373,7 @@ async function handleFormSubmit(e) {
     const selfieDataUrl = document.getElementById("selfie_data").value || "";
 
     const step2Data = {
+      id_type_id: idTypeId,
       id_type: idType,
       id_number: idNumber,
       documents_uploaded: true,

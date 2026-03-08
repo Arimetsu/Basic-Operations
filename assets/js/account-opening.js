@@ -25,13 +25,35 @@ function getApiBaseUrl() {
 const API_BASE_URL = getApiBaseUrl();
 console.log("API Base URL:", API_BASE_URL);
 
+// Account types data cache
+let accountTypesData = {};
+
 // Initialize on page load
 document.addEventListener("DOMContentLoaded", function () {
+  loadAccountTypes(); // Load account types first
   setupAccountTypeSelection();
   setupFormHandlers();
   loadCustomerAccounts();
   updateSubmitButtonState(); // Initialize button state (should be disabled)
 });
+
+// Load account types from database
+async function loadAccountTypes() {
+  try {
+    const response = await fetch(`${API_BASE_URL}/common/get-account-types.php`);
+    const data = await response.json();
+    
+    if (data.success && data.account_types) {
+      // Store account types indexed by type_name for easy lookup
+      data.account_types.forEach(type => {
+        accountTypesData[type.type_name] = type;
+      });
+      console.log("Account types loaded:", accountTypesData);
+    }
+  } catch (error) {
+    console.error("Error loading account types:", error);
+  }
+}
 
 // Setup account type card selection
 function setupAccountTypeSelection() {
@@ -53,6 +75,46 @@ function setupAccountTypeSelection() {
         Checking: "Checking Account",
       };
       hiddenInput.value = typeMap[shortType] || shortType;
+
+      // Handle passbook/ATM card restrictions based on database account type settings
+      const passbookCheckbox = document.getElementById("wants_passbook");
+      const atmCheckbox = document.getElementById("wants_atm_card");
+      
+      // Get the database account type name from data attribute
+      const dbTypeName = this.getAttribute("data-db-name");
+      const accountType = accountTypesData[dbTypeName];
+      
+      console.log("Selected account type:", dbTypeName, accountType);
+      
+      if (accountType) {
+        // Set passbook based on allows_passbook flag
+        if (accountType.allows_passbook) {
+          passbookCheckbox.disabled = false;
+          passbookCheckbox.checked = true;
+          passbookCheckbox.parentElement.style.opacity = "1";
+          console.log("Passbook enabled");
+        } else {
+          passbookCheckbox.disabled = true;
+          passbookCheckbox.checked = false;
+          passbookCheckbox.parentElement.style.opacity = "0.5";
+          console.log("Passbook disabled");
+        }
+        
+        // Set ATM card based on allows_atm_card flag
+        if (accountType.allows_atm_card) {
+          atmCheckbox.disabled = false;
+          atmCheckbox.checked = true;
+          atmCheckbox.parentElement.style.opacity = "1";
+          console.log("ATM card enabled");
+        } else {
+          atmCheckbox.disabled = true;
+          atmCheckbox.checked = false;
+          atmCheckbox.parentElement.style.opacity = "0.5";
+          console.log("ATM card disabled");
+        }
+      } else {
+        console.warn("Account type not found in database:", dbTypeName);
+      }
 
       // Clear error
       clearError("account_type");

@@ -1252,7 +1252,7 @@ class CustomerController extends Controller {
         
         // Always get the primary email from database to ensure accuracy
         $this->db->query("
-            SELECT email FROM Emails 
+            SELECT email FROM emails 
             WHERE customer_id = :customer_id AND is_active = 1 AND is_primary = 1
             LIMIT 1
         ");
@@ -1263,7 +1263,7 @@ class CustomerController extends Controller {
         // Fallback to any active email if no primary is set
         if (!$customerEmail) {
             $this->db->query("
-                SELECT email FROM Emails 
+                SELECT email FROM emails 
                 WHERE customer_id = :customer_id AND is_active = 1
                 ORDER BY created_at ASC 
                 LIMIT 1
@@ -1492,7 +1492,7 @@ class CustomerController extends Controller {
         if (!$customerEmail && isset($_SESSION['customer_id'])) {
             // Get email from Emails table using the Customer model
             $this->db->query("
-                SELECT email FROM Emails 
+                SELECT email FROM emails 
                 WHERE customer_id = :customer_id AND is_active = 1
                 ORDER BY is_primary DESC, created_at ASC 
                 LIMIT 1
@@ -1562,7 +1562,8 @@ class CustomerController extends Controller {
                 'submitted_at' => $submittedAt,
                 'reviewed_at' => $reviewedAt,
                 'wants_passbook' => $app->wants_passbook ?? 0,
-                'wants_atm_card' => $app->wants_atm_card ?? 0
+                'wants_atm_card' => $app->wants_atm_card ?? 0,
+                'rejection_reason' => $app->rejection_reason ?? null
             ];
         }
 

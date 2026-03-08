@@ -183,6 +183,22 @@
             </div>
         <?php endif; ?>
 
+        <?php if (!empty($_SESSION['signup_success'])): ?>
+            <div class="alert alert-success text-center" role="alert">
+                <i class="bi bi-check-circle-fill me-2"></i>
+                <?= htmlspecialchars($_SESSION['signup_success']) ?>
+            </div>
+            <?php unset($_SESSION['signup_success']); ?>
+        <?php endif; ?>
+
+        <?php if (!empty($_SESSION['error'])): ?>
+            <div class="alert alert-danger text-center" role="alert">
+                <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                <?= htmlspecialchars($_SESSION['error']) ?>
+            </div>
+            <?php unset($_SESSION['error']); ?>
+        <?php endif; ?>
+
         <form action="<?= URLROOT; ?>/auth/login" method="POST">
             <div class="mb-3">
                 <label for="identifier" class="form-label">

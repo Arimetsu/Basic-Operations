@@ -139,7 +139,7 @@ try {
         'employment_status' => $data['employment_status'] ?? null,
         'occupation' => $data['job_title'] ?? $data['occupation'] ?? null,
         'employer_name' => $data['employer_name'] ?? '',
-        'annual_income' => $data['annual_income'] ?? null,
+        'income_range' => $data['income_range'] ?? $data['annual_income'] ?? null, // Support both field names
         'source_of_funds' => $data['source_of_funds'] ?? null,
         'password_hash' => $data['password_hash'] ?? null, // NULL for walk-in registrations
         'account_type' => $data['account_type'] ?? 'Savings', // Get account type from step 1

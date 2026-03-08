@@ -1,7 +1,7 @@
 <?php
 /**
- * API Endpoint: Get all provinces
- * Returns list of all provinces from the database
+ * API Endpoint: Get all ID types
+ * Returns list of valid ID types from database
  */
 
 header('Content-Type: application/json');
@@ -14,36 +14,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit();
 }
 
-// Include database configuration
 require_once '../../config/database.php';
 
 try {
-    // Get database connection
-    $pdo = getDBConnection();
-    
-    if (!$pdo) {
+    $db = getDBConnection();
+    if (!$db) {
         throw new Exception('Database connection failed');
     }
-    
-    // Fetch all provinces ordered by name
-    $stmt = $pdo->prepare("
-        SELECT province_id, province_name, region 
-        FROM provinces 
-        ORDER BY province_name ASC
-    ");
-    
+
+    $stmt = $db->prepare(
+        "SELECT id_type_id, type_name, description
+         FROM id_types
+         ORDER BY type_name ASC"
+    );
     $stmt->execute();
-    $provinces = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
+    $idTypes = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
     echo json_encode([
         'success' => true,
-        'data' => $provinces
+        'data' => $idTypes,
     ]);
-    
-} catch (PDOException $e) {
+} catch (Exception $e) {
     http_response_code(500);
+    error_log('get-id-types.php error: ' . $e->getMessage());
     echo json_encode([
         'success' => false,
-        'message' => 'Database error: ' . $e->getMessage()
+        'message' => 'Failed to load ID types',
+        'error' => $e->getMessage(),
     ]);
 }

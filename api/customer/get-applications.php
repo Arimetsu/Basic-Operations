@@ -34,20 +34,28 @@ try {
     $status = $_GET['status'] ?? '';
     $accountType = $_GET['account_type'] ?? '';
     
-    // Build query
+    // Build query - join with customers, emails, phones and account types
     $query = "
         SELECT 
             aa.application_id,
             aa.application_number,
             aa.application_status,
-            aa.first_name,
-            aa.middle_name,
-            aa.last_name,
-            aa.email,
-            aa.phone_number,
-            aa.account_type,
-            aa.submitted_at
+            c.first_name,
+            c.middle_name,
+            c.last_name,
+            CONCAT(c.first_name, ' ', COALESCE(c.middle_name, ''), ' ', c.last_name) as full_name,
+            e.email,
+            p.phone_number,
+            bat.type_name as account_type,
+            aa.wants_passbook,
+            aa.wants_atm_card,
+            aa.submitted_at,
+            aa.reviewed_at
         FROM account_applications aa
+        INNER JOIN bank_customers c ON aa.customer_id = c.customer_id
+        LEFT JOIN emails e ON aa.customer_id = e.customer_id AND e.is_primary = 1
+        LEFT JOIN phones p ON aa.customer_id = p.customer_id AND p.is_primary = 1
+        INNER JOIN bank_account_types bat ON aa.account_type_id = bat.account_type_id
         WHERE 1=1
     ";
     
@@ -61,7 +69,7 @@ try {
     
     // Add account type filter
     if (!empty($accountType)) {
-        $query .= " AND aa.account_type = :account_type";
+        $query .= " AND bat.type_name = :account_type";
         $params[':account_type'] = $accountType;
     }
     
@@ -77,6 +85,14 @@ try {
     
     $stmt->execute();
     $applications = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    // Convert application_status to lowercase for frontend consistency
+    foreach ($applications as &$app) {
+        if (isset($app['application_status'])) {
+            $app['application_status'] = strtolower($app['application_status']);
+        }
+    }
+    unset($app); // Break reference
     
     echo json_encode([
         'success' => true,

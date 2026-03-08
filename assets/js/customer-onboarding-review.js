@@ -1418,7 +1418,7 @@ async function submitApplication() {
 
     console.log("Sending form data to API with files");
 
-    const response = await fetch(`${API_BASE_URL}/customer/create-final.php`, {
+    const response = await fetch(`${API_BASE_URL}/customer/create-customer-onboarding.php`, {
       method: "POST",
       credentials: "include",
       body: formData,
@@ -1436,10 +1436,17 @@ async function submitApplication() {
     }
 
     const result = await response.json();
+    if (!response.ok) {
+      const backendMessage =
+        result?.error || result?.message || `Server error (${response.status})`;
+      throw new Error(backendMessage);
+    }
 
     if (result.success) {
-      // Show success modal with account number
-      showSuccessModal(result.account_number);
+      // Show success modal with application/account number
+      const referenceNumber =
+        result.account_number || result.application_number || result.application_id || "-";
+      showSuccessModal(referenceNumber);
     } else {
       // Handle errors with inline message
       let errorMsg = "";
@@ -1463,7 +1470,9 @@ async function submitApplication() {
     }
   } catch (error) {
     console.error("Error submitting application:", error);
-    showGlobalError("An error occurred while submitting your application");
+    showGlobalError(
+      `An error occurred while submitting your application: ${error.message || "Unknown error"}`,
+    );
 
     // Re-enable button
     if (submitBtn) {
@@ -1483,9 +1492,14 @@ function showSuccessModal(accountNumber) {
     accountNumberEl.textContent = accountNumber;
   }
 
-  const successModal = new bootstrap.Modal(
-    document.getElementById("successModal"),
-  );
+  const successModalEl = document.getElementById("successModal");
+  if (!successModalEl) {
+    // Fallback: if modal is missing, continue to dashboard directly.
+    goToLogin();
+    return;
+  }
+
+  const successModal = new bootstrap.Modal(successModalEl);
   successModal.show();
 }
 

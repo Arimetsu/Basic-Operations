@@ -26,14 +26,15 @@ try {
         exit();
     }
     
-    // Database connection
-    $host = 'localhost';
-    $dbname = 'BankingDB';
-    $username = 'root';
-    $password = '';
+    // Include database configuration
+    require_once '../../config/database.php';
     
-    $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8mb4", $username, $password);
-    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    // Get database connection
+    $pdo = getDBConnection();
+    
+    if (!$pdo) {
+        throw new Exception('Database connection failed');
+    }
     
     // Fetch barangays for the specified city
     $stmt = $pdo->prepare("

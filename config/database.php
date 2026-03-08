@@ -8,7 +8,7 @@
 define('DB_HOST', 'localhost');
 define('DB_USER', 'root');           // Default XAMPP username
 define('DB_PASS', '');               // Default XAMPP password (empty)
-define('DB_NAME', 'BankingDB');
+define('DB_NAME', 'basic-operation');
 define('DB_CHARSET', 'utf8mb4');
 
 // Error reporting (set to 0 in production)

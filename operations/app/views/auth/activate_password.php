@@ -1,23 +1,29 @@
 <?php
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 // Redirect if OTP not verified
 if (!isset($_SESSION['otp_activation_verified']) || !isset($_SESSION['activation_customer_id'])) {
     $protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http';
     $host = $_SERVER['HTTP_HOST'];
-    $activatePath = '/Evergreen/bank-system/Basic-operation/operations/app/views/auth/activate.php';
-    header('Location: ' . $protocol . '://' . $host . $activatePath);
+    $basePath = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/');
+    $urlRootLocal = $protocol . '://' . $host . $basePath;
+    header('Location: ' . $urlRootLocal . '/index.php?url=auth/activate');
     exit();
 }
 
-// Include database connection
-require_once $_SERVER['DOCUMENT_ROOT'] . '/Evergreen/bank-system/evergreen-marketing/db_connect.php';
+// Include database connection (works for direct-file access too)
+require_once __DIR__ . '/../../../core/Database.php';
+$db = new Database();
+$conn = $db->getConnection();
 
 // Define URLROOT if not defined
 if (!defined('URLROOT')) {
     $protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http';
     $host = $_SERVER['HTTP_HOST'];
-    define('URLROOT', $protocol . '://' . $host . '/Evergreen/bank-system/Basic-operation/operations/public');
+    $basePath = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/');
+    define('URLROOT', $protocol . '://' . $host . $basePath);
 }
 
 $error = "";
@@ -39,12 +45,34 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['set_password'])) {
         $password_hash = password_hash($password, PASSWORD_DEFAULT);
         
         // Update customer password
-        $sql = "UPDATE Customers SET password_hash = ? WHERE customer_id = ?";
+        $sql = "UPDATE bank_customers SET password_hash = ?, is_active = 1 WHERE customer_id = ?";
         $stmt = $conn->prepare($sql);
         $stmt->bind_param('si', $password_hash, $_SESSION['activation_customer_id']);
         
         if ($stmt->execute()) {
             $stmt->close();
+
+            // Activate the selected account for online banking access
+            if (isset($_SESSION['activation_account']) && !empty($_SESSION['activation_account'])) {
+                $account_number = $_SESSION['activation_account'];
+
+                $accSql = "UPDATE customer_accounts SET is_active = 1 WHERE account_number = ? AND customer_id = ?";
+                $accStmt = $conn->prepare($accSql);
+                $accStmt->bind_param('si', $account_number, $_SESSION['activation_customer_id']);
+                $accStmt->execute();
+                $accStmt->close();
+
+                // Keep linked account visibility in sync
+                $linkSql = "UPDATE customer_linked_accounts cla
+                            INNER JOIN customer_accounts ca ON cla.account_id = ca.account_id
+                            SET cla.is_active = 1
+                            WHERE ca.account_number = ? AND cla.customer_id = ?";
+                $linkStmt = $conn->prepare($linkSql);
+                $linkStmt->bind_param('si', $account_number, $_SESSION['activation_customer_id']);
+                $linkStmt->execute();
+                $linkStmt->close();
+            }
+
             // Clear activation session
             unset($_SESSION['activation_otp']);
             unset($_SESSION['activation_account']);
@@ -55,11 +83,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['set_password'])) {
             
             $success = true;
             
-            // Redirect to login after 3 seconds (direct path to avoid router)
-            $protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http';
-            $host = $_SERVER['HTTP_HOST'];
-            $loginPath = '/Evergreen/bank-system/evergreen-marketing/login.php';
-            header("refresh:3;url=" . $protocol . '://' . $host . $loginPath);
+            // Redirect to this app's login page after 3 seconds
+            header("refresh:3;url=" . URLROOT . '/auth/login');
         } else {
             $error = "Failed to set password. Please try again.";
         }

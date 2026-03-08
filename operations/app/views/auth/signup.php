@@ -193,6 +193,17 @@
         background: #d1f2e6;
         border-style: solid;
     }
+    .camera-upload-btn {
+        margin-top: 10px;
+        width: 100%;
+    }
+    #signupCameraVideo,
+    #signupCameraPreview {
+        width: 100%;
+        max-height: 360px;
+        border-radius: 10px;
+        background: #111;
+    }
     .review-section {
         background: #f8f9fa;
         padding: 15px;
@@ -574,7 +585,10 @@
                             <p class="mb-0 mt-2">Click to upload</p>
                             <small class="text-muted">Max 5MB</small>
                         </div>
-                        <input type="file" name="id_front" id="id_front" class="d-none" accept="image/*">
+                        <button type="button" class="btn btn-outline-success btn-sm camera-upload-btn" onclick="openCameraFor('id_front')">
+                            <i class="bi bi-camera me-1"></i>Use Live Camera
+                        </button>
+                        <input type="file" name="id_front" id="id_front" class="d-none" accept="image/*" required>
                     </div>
                     <div class="col-md-6 mb-3">
                         <label class="form-label">Upload ID (Back)</label>
@@ -583,6 +597,9 @@
                             <p class="mb-0 mt-2">Click to upload</p>
                             <small class="text-muted">Max 5MB</small>
                         </div>
+                        <button type="button" class="btn btn-outline-success btn-sm camera-upload-btn" onclick="openCameraFor('id_back')">
+                            <i class="bi bi-camera me-1"></i>Use Live Camera
+                        </button>
                         <input type="file" name="id_back" id="id_back" class="d-none" accept="image/*">
                     </div>
                 </div>
@@ -603,7 +620,10 @@
                             <p class="mb-0 mt-2">Upload Photo</p>
                             <small class="text-muted">Max 5MB</small>
                         </div>
-                        <input type="file" name="profile_picture" id="profile_picture" class="d-none" accept="image/*">
+                        <button type="button" class="btn btn-outline-success btn-sm camera-upload-btn" onclick="openCameraFor('profile_picture')">
+                            <i class="bi bi-camera me-1"></i>Use Live Camera
+                        </button>
+                        <input type="file" name="profile_picture" id="profile_picture" class="d-none" accept="image/*" required>
                     </div>
                     <div class="col-md-6 mb-3">
                         <label class="form-label">Digital Signature *</label>
@@ -612,7 +632,10 @@
                             <p class="mb-0 mt-2">Upload Signature</p>
                             <small class="text-muted">Max 5MB</small>
                         </div>
-                        <input type="file" name="signature" id="signature" class="d-none" accept="image/*">
+                        <button type="button" class="btn btn-outline-success btn-sm camera-upload-btn" onclick="openCameraFor('signature')">
+                            <i class="bi bi-camera me-1"></i>Use Live Camera
+                        </button>
+                        <input type="file" name="signature" id="signature" class="d-none" accept="image/*" required>
                     </div>
                 </div>
             </div>
@@ -636,12 +659,12 @@
                         </div>
                     </div>
                     <div class="col-md-6 mb-3">
-                        <div class="account-type-card" onclick="selectAccountType(2, this)">
-                            <input type="radio" name="account_type_id" value="2" id="account_junior" required>
-                            <label for="account_junior" style="cursor: pointer; margin: 0;">
-                                <h5 class="mb-1">Junior Savings</h5>
-                                <p class="mb-2 text-muted small">₱0 minimum balance</p>
-                                <p class="mb-0 small">Savings for minors (requires parent/guardian)</p>
+                        <div class="account-type-card" onclick="selectAccountType(3, this)">
+                            <input type="radio" name="account_type_id" value="3" id="account_checking" required>
+                            <label for="account_checking" style="cursor: pointer; margin: 0;">
+                                <h5 class="mb-1">Checking Account</h5>
+                                <p class="mb-2 text-muted small">₱5,000 minimum balance</p>
+                                <p class="mb-0 small">Best for frequent transactions and business use</p>
                             </label>
                         </div>
                     </div>
@@ -738,6 +761,39 @@
     </div>
 </div>
 
+<!-- Live Camera Modal -->
+<div class="modal fade" id="cameraModal" tabindex="-1" aria-labelledby="cameraModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="cameraModalLabel">Capture Image</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <video id="signupCameraVideo" autoplay playsinline></video>
+                <canvas id="signupCameraCanvas" class="d-none"></canvas>
+                <img id="signupCameraPreview" alt="Captured preview" class="d-none" />
+            </div>
+            <div class="modal-footer d-flex justify-content-between">
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-outline-success" id="startSignupCameraBtn">
+                        <i class="bi bi-camera-video me-1"></i>Start Camera
+                    </button>
+                    <button type="button" class="btn btn-success" id="captureSignupPhotoBtn" disabled>
+                        <i class="bi bi-camera me-1"></i>Capture
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary" id="retakeSignupPhotoBtn" style="display:none;">
+                        <i class="bi bi-arrow-clockwise me-1"></i>Retake
+                    </button>
+                </div>
+                <button type="button" class="btn btn-primary" id="useSignupPhotoBtn" disabled>
+                    Use This Photo
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Terms and Conditions Modal -->
 <div class="modal fade" id="termsModal" tabindex="-1" aria-labelledby="termsModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
@@ -821,6 +877,9 @@
 <script>
 let currentStep = 1;
 const totalSteps = 8;
+let signupCameraStream = null;
+let activeCameraTargetInputId = null;
+let cameraCaptureDataUrl = '';
 
 // Load cities and barangays data
 const citiesData = <?= json_encode($data['cities'] ?? []) ?>;
@@ -958,7 +1017,8 @@ document.getElementById('city_id').addEventListener('change', function() {
 // File upload handlers
 ['id_front', 'id_back', 'profile_picture', 'signature'].forEach(id => {
     document.getElementById(id).addEventListener('change', function(e) {
-        const box = document.getElementById(id + '_box');
+        const boxId = id === 'profile_picture' ? 'profile_pic_box' : id + '_box';
+        const box = document.getElementById(boxId);
         if (this.files.length > 0) {
             box.classList.add('has-file');
             const fileName = this.files[0].name;
@@ -972,7 +1032,8 @@ function selectAccountType(type, element) {
         card.classList.remove('selected');
     });
     element.classList.add('selected');
-    document.getElementById('account_' + (type === 1 ? 'savings' : 'junior')).checked = true;
+    const targetId = (type === 1) ? 'account_savings' : 'account_checking';
+    document.getElementById(targetId).checked = true;
 }
 
 function changeStep(direction) {
@@ -1080,6 +1141,131 @@ function populateReview() {
     const accountType = document.querySelector('input[name="account_type_id"]:checked')?.nextElementSibling?.querySelector('h5')?.textContent || '';
     document.getElementById('review_account_type').textContent = accountType;
 }
+
+function openCameraFor(inputId) {
+    activeCameraTargetInputId = inputId;
+    cameraCaptureDataUrl = '';
+
+    document.getElementById('signupCameraVideo').classList.remove('d-none');
+    document.getElementById('signupCameraPreview').classList.add('d-none');
+    document.getElementById('captureSignupPhotoBtn').disabled = true;
+    document.getElementById('useSignupPhotoBtn').disabled = true;
+    document.getElementById('retakeSignupPhotoBtn').style.display = 'none';
+    document.getElementById('startSignupCameraBtn').disabled = false;
+
+    const modal = new bootstrap.Modal(document.getElementById('cameraModal'));
+    modal.show();
+}
+
+async function startSignupCamera() {
+    try {
+        const video = document.getElementById('signupCameraVideo');
+        signupCameraStream = await navigator.mediaDevices.getUserMedia({
+            video: {
+                facingMode: 'user',
+                width: { ideal: 1280 },
+                height: { ideal: 720 }
+            },
+            audio: false
+        });
+
+        video.srcObject = signupCameraStream;
+        document.getElementById('captureSignupPhotoBtn').disabled = false;
+        document.getElementById('startSignupCameraBtn').disabled = true;
+    } catch (error) {
+        alert('Unable to access camera. Please allow camera permission and try again.');
+    }
+}
+
+function captureSignupPhoto() {
+    const video = document.getElementById('signupCameraVideo');
+    const canvas = document.getElementById('signupCameraCanvas');
+    const preview = document.getElementById('signupCameraPreview');
+
+    if (!video.videoWidth || !video.videoHeight) {
+        return;
+    }
+
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext('2d').drawImage(video, 0, 0);
+
+    cameraCaptureDataUrl = canvas.toDataURL('image/jpeg', 0.9);
+    preview.src = cameraCaptureDataUrl;
+    preview.classList.remove('d-none');
+    video.classList.add('d-none');
+
+    document.getElementById('retakeSignupPhotoBtn').style.display = 'inline-block';
+    document.getElementById('useSignupPhotoBtn').disabled = false;
+
+    stopSignupCamera();
+}
+
+function retakeSignupPhoto() {
+    cameraCaptureDataUrl = '';
+    document.getElementById('signupCameraPreview').classList.add('d-none');
+    document.getElementById('signupCameraVideo').classList.remove('d-none');
+    document.getElementById('useSignupPhotoBtn').disabled = true;
+    document.getElementById('retakeSignupPhotoBtn').style.display = 'none';
+    document.getElementById('captureSignupPhotoBtn').disabled = true;
+    document.getElementById('startSignupCameraBtn').disabled = false;
+}
+
+function useCapturedSignupPhoto() {
+    if (!cameraCaptureDataUrl || !activeCameraTargetInputId) {
+        return;
+    }
+
+    const input = document.getElementById(activeCameraTargetInputId);
+    if (!input) {
+        return;
+    }
+
+    const targetPrefix = activeCameraTargetInputId === 'profile_picture' ? 'profile' : activeCameraTargetInputId;
+
+    fetch(cameraCaptureDataUrl)
+        .then(response => response.blob())
+        .then(blob => {
+            const file = new File([blob], `${targetPrefix}_capture_${Date.now()}.jpg`, { type: 'image/jpeg' });
+            const transfer = new DataTransfer();
+            transfer.items.add(file);
+            input.files = transfer.files;
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+
+            const modalInstance = bootstrap.Modal.getInstance(document.getElementById('cameraModal'));
+            if (modalInstance) {
+                modalInstance.hide();
+            }
+        })
+        .catch(() => {
+            alert('Failed to apply captured image. Please try again.');
+        });
+}
+
+function stopSignupCamera() {
+    if (signupCameraStream) {
+        signupCameraStream.getTracks().forEach(track => track.stop());
+        signupCameraStream = null;
+    }
+}
+
+document.getElementById('startSignupCameraBtn').addEventListener('click', startSignupCamera);
+document.getElementById('captureSignupPhotoBtn').addEventListener('click', captureSignupPhoto);
+document.getElementById('retakeSignupPhotoBtn').addEventListener('click', retakeSignupPhoto);
+document.getElementById('useSignupPhotoBtn').addEventListener('click', useCapturedSignupPhoto);
+
+document.getElementById('cameraModal').addEventListener('hidden.bs.modal', function() {
+    stopSignupCamera();
+    cameraCaptureDataUrl = '';
+    activeCameraTargetInputId = null;
+
+    document.getElementById('signupCameraPreview').classList.add('d-none');
+    document.getElementById('signupCameraVideo').classList.remove('d-none');
+    document.getElementById('captureSignupPhotoBtn').disabled = true;
+    document.getElementById('useSignupPhotoBtn').disabled = true;
+    document.getElementById('retakeSignupPhotoBtn').style.display = 'none';
+    document.getElementById('startSignupCameraBtn').disabled = false;
+});
 
 // Form validation on submit
 document.getElementById('signupForm').addEventListener('submit', function(e) {

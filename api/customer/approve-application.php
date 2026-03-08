@@ -44,7 +44,7 @@ try {
         $stmt = $db->prepare("
             SELECT * FROM account_applications 
             WHERE application_id = :application_id 
-            AND application_status = 'pending'
+            AND application_status = 'Pending'
         ");
         $stmt->bindParam(':application_id', $applicationId);
         $stmt->execute();
@@ -82,32 +82,36 @@ try {
             throw new Exception('Customer record not found for this application');
         }
         
-        // 3. Get account type ID
-        $accountTypeBase = $application['account_type']; // e.g., 'Savings Account' or 'Checking Account'
+        // 3. Get account type ID and details from the application
+        $accountTypeId = $application['account_type_id'];
+        
+        // Get account type details for generating account number
         $stmt = $db->prepare("
             SELECT account_type_id, type_name
             FROM bank_account_types 
-            WHERE type_name LIKE :type_name
+            WHERE account_type_id = :account_type_id
         ");
-        // Use LIKE to match 'Savings' with 'Savings Account' or 'Checking' with 'Checking Account'
-        $searchPattern = '%' . $accountTypeBase . '%';
-        $stmt->bindParam(':type_name', $searchPattern);
+        $stmt->bindParam(':account_type_id', $accountTypeId);
         $stmt->execute();
         $accountType = $stmt->fetch(PDO::FETCH_ASSOC);
         
         if (!$accountType) {
-            throw new Exception('Account type not found: ' . $accountTypeBase);
+            throw new Exception('Account type not found for ID: ' . $accountTypeId);
         }
         
-        $accountTypeId = $accountType['account_type_id'];
-        
         // 4. Generate account number in format: SA-XXXX-YYYY or CHA-XXXX-YYYY
-        // SA = Savings Account, CHA = Checking Account
+        // SA = Savings Account, CHA = Current/Checking Account
         // XXXX = Random 4-digit number
         // YYYY = Current year
-        // Check if it's a Savings Account (type_name contains 'Savings')
-        $isSavings = stripos($accountType['type_name'], 'Savings') !== false;
-        $prefix = $isSavings ? 'SA' : 'CHA';
+        
+        // Determine prefix based on account type
+        $typeName = $accountType['type_name'];
+        if (stripos($typeName, 'Savings') !== false) {
+            $prefix = 'SA';
+        } else {
+            $prefix = 'CHA'; // Current, Checking, or other account types
+        }
+        
         $randomNumber = str_pad(rand(1000, 9999), 4, '0', STR_PAD_LEFT);
         $year = date('Y');
         $accountNumber = $prefix . '-' . $randomNumber . '-' . $year;
@@ -138,6 +142,7 @@ try {
                 customer_id,
                 account_type_id,
                 is_locked,
+                is_active,
                 created_at,
                 created_by_employee_id,
                 account_status
@@ -145,6 +150,7 @@ try {
                 :account_number,
                 :customer_id,
                 :account_type_id,
+                0,
                 0,
                 NOW(),
                 :employee_id,
@@ -169,7 +175,7 @@ try {
             ) VALUES (
                 :customer_id,
                 :account_id,
-                1
+                0
             )
         ");
         $stmt->bindParam(':customer_id', $customerId);
@@ -179,7 +185,7 @@ try {
         // 7. Update application status to approved
         $stmt = $db->prepare("
             UPDATE account_applications 
-            SET application_status = 'approved',
+            SET application_status = 'Approved',
                 reviewed_at = NOW(),
                 reviewed_by_employee_id = :employee_id
             WHERE application_id = :application_id

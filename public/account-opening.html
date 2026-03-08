@@ -275,7 +275,7 @@
               <div class="section-title">Select Account Type</div>
 
               <div class="form-row" style="gap: 20px; margin-bottom: 20px">
-                <div class="account-type-card" data-type="Savings">
+                <div class="account-type-card" data-type="Savings" data-type-id="1" data-db-name="Savings">
                   <h6>Savings Account</h6>
                   <p>
                     Earn interest on your deposits. Ideal for long-term savings
@@ -293,7 +293,7 @@
                     <li>Perfect for savings goals</li>
                   </ul>
                 </div>
-                <div class="account-type-card" data-type="Checking">
+                <div class="account-type-card" data-type="Checking" data-type-id="3" data-db-name="Current">
                   <h6>Checking Account</h6>
                   <p>Daily transaction account. Easy access to your funds.</p>
                   <ul
@@ -317,6 +317,54 @@
                 required
               />
               <div class="error-message" id="error-account_type"></div>
+
+              <!-- Card & Passbook Options -->
+              <div class="section-title">Card & Passbook Services</div>
+              
+              <div class="form-row">
+                <div class="form-group">
+                  <div class="form-check mb-3">
+                    <input
+                      class="form-check-input"
+                      type="checkbox"
+                      name="wants_passbook"
+                      id="wants_passbook"
+                      value="1"
+                      checked
+                    />
+                    <label class="form-check-label" for="wants_passbook">
+                      <strong>I want a Passbook</strong>
+                      <small class="d-block text-muted" style="font-size: 11px">
+                        Physical record of all your transactions
+                      </small>
+                    </label>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <div class="form-check mb-3">
+                    <input
+                      class="form-check-input"
+                      type="checkbox"
+                      name="wants_atm_card"
+                      id="wants_atm_card"
+                      value="1"
+                      checked
+                    />
+                    <label class="form-check-label" for="wants_atm_card">
+                      <strong>I want an ATM/Debit Card</strong>
+                      <small class="d-block text-muted" style="font-size: 11px">
+                        Access your account via ATM and make purchases
+                      </small>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <div class="info-box" style="margin-bottom: 30px">
+                <p style="font-size: 13px">
+                  <strong>Note:</strong> Card and passbook will be issued at the branch when you activate your account with the initial deposit.
+                </p>
+              </div>
 
               <!-- Additional Information -->
               <div class="section-title">Additional Information</div>

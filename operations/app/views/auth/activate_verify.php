@@ -1,27 +1,29 @@
 <?php
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
-// Include database connection
-require_once $_SERVER['DOCUMENT_ROOT'] . '/Evergreen/bank-system/evergreen-marketing/db_connect.php';
+// Include database connection (works for direct-file access too)
+require_once __DIR__ . '/../../../core/Database.php';
+$db = new Database();
+$conn = $db->getConnection();
 
 // Define URLROOT if not defined
 if (!defined('URLROOT')) {
     $protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http';
     $host = $_SERVER['HTTP_HOST'];
-    define('URLROOT', $protocol . '://' . $host . '/Evergreen/bank-system/Basic-operation/operations/public');
+    $basePath = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/');
+    define('URLROOT', $protocol . '://' . $host . $basePath);
 }
 
 // Include PHPMailer
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
-
-require_once $_SERVER['DOCUMENT_ROOT'] . '/Evergreen/bank-system/evergreen-marketing/PHPMailer-7.0.0/src/Exception.php';
-require_once $_SERVER['DOCUMENT_ROOT'] . '/Evergreen/bank-system/evergreen-marketing/PHPMailer-7.0.0/src/PHPMailer.php';
-require_once $_SERVER['DOCUMENT_ROOT'] . '/Evergreen/bank-system/evergreen-marketing/PHPMailer-7.0.0/src/SMTP.php';
+require_once __DIR__ . '/../../../vendor/autoload.php';
 
 // Redirect if no activation session exists
 if (!isset($_SESSION['activation_otp']) || !isset($_SESSION['activation_customer_id'])) {
-    header('Location: ' . (defined('URLROOT') ? URLROOT : '') . '/auth/activate');
+    header('Location: ' . URLROOT . '/index.php?url=auth/activate');
     exit();
 }
 
@@ -51,18 +53,15 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             // OTP verified successfully
             $_SESSION['otp_activation_verified'] = true;
             
-            // Redirect to password setup (direct file path, not through router)
-            $protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http';
-            $host = $_SERVER['HTTP_HOST'];
-            $passwordSetupPath = '/Evergreen/bank-system/Basic-operation/operations/app/views/auth/activate_password.php';
-            header('Location: ' . $protocol . '://' . $host . $passwordSetupPath);
+            // Redirect to password setup inside this app router
+            header('Location: ' . URLROOT . '/index.php?url=auth/activatePassword');
             exit();
         }
     } elseif (isset($_POST['resend_otp'])) {
         // Resend OTP logic
         
         // Get customer details
-        $sql = "SELECT first_name FROM Customers WHERE customer_id = ?";
+        $sql = "SELECT first_name FROM bank_customers WHERE customer_id = ?";
         $stmt = $conn->prepare($sql);
         $stmt->bind_param('i', $_SESSION['activation_customer_id']);
         $stmt->execute();

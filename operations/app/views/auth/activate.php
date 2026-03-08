@@ -14,6 +14,7 @@ if (!isset($_POST['verify_account']) && !isset($_GET['continue'])) {
 // Include PHPMailer
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
+require_once __DIR__ . '/../../../vendor/autoload.php';
 
 $error = "";
 $step = 1; // Step 1: Verify account and email, send OTP
@@ -35,12 +36,15 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['verify_account'])) {
                     c.customer_id,
                     c.first_name,
                     c.password_hash,
-                    a.account_number
-                FROM customers c
-                INNER JOIN accounts a ON c.customer_id = a.customer_id
+                    c.is_active,
+                    a.account_number,
+                    a.is_active AS account_is_active
+                FROM bank_customers c
+                INNER JOIN customer_accounts a ON c.customer_id = a.customer_id
                 INNER JOIN emails e ON c.customer_id = e.customer_id
                 WHERE a.account_number = ? 
-                AND e.email = ?
+                AND LOWER(e.email) = LOWER(?)
+                AND e.is_primary = 1
                 AND e.is_active = 1
                 LIMIT 1";
         $stmt = $conn->prepare($sql);
@@ -52,10 +56,19 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['verify_account'])) {
         
         if (!$result) {
             $error = "Account number and email do not match our records.";
-        } elseif (!empty($result->password_hash)) {
+        } else {
+            // Allow activation when password is NULL, empty, whitespace, or literal "null".
+            $passwordValue = isset($result->password_hash) ? (string)$result->password_hash : '';
+            $trimmedPassword = trim($passwordValue);
+            $hasRealPassword = ($trimmedPassword !== '' && strtolower($trimmedPassword) !== 'null');
+            $isAccountActive = isset($result->account_is_active) && (int)$result->account_is_active === 1;
+
+            // Consider already activated only when this specific account is active
+            // and a real password is already present.
+            if ($hasRealPassword && $isAccountActive) {
             // User already has a password, redirect to login
             $error = "This account already has online banking activated. Please use <a href='" . URLROOT . "/auth/login' class='text-decoration-none fw-bold' style='color: #003631;'>Login</a>.";
-        } else {
+            } else {
             // Generate 6-digit OTP
             $otp = sprintf("%06d", mt_rand(0, 999999));
             $_SESSION['activation_otp'] = $otp;
@@ -106,12 +119,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['verify_account'])) {
                 
                 $mail->send();
                 
-                // Redirect to OTP verification page
-                header('Location: ' . URLROOT . '/auth/activateVerify');
+                // Redirect to OTP verification page (route-safe even without rewrite)
+                header('Location: ' . URLROOT . '/index.php?url=auth/activateVerify');
                 exit();
                 
             } catch (Exception $e) {
                 $error = "Failed to send verification code. Please try again later.";
+            }
             }
         }
     }

@@ -91,6 +91,10 @@ try {
         $errors['id_back_image'] = 'Back image of ID is required';
     }
 
+    // Get passbook and ATM card preferences
+    $wantsPassbook = isset($input['wants_passbook']) && $input['wants_passbook'] == '1' ? 1 : 0;
+    $wantsAtmCard = isset($input['wants_atm_card']) && $input['wants_atm_card'] == '1' ? 1 : 0;
+    
     // Validate initial deposit if provided
     $initialDeposit = null;
     $depositSource = null;
@@ -190,55 +194,6 @@ try {
         $customerId = $existingAccount['customer_id'];
     }
 
-    // Fetch customer information from existing account's bank_customers and application
-    $existingApplication = null;
-    if (!empty($input['existing_account_number'])) {
-        $existingAccountNumber = trim($input['existing_account_number']);
-        
-        // Try to get application data, use LEFT JOIN to handle cases where application_id might be NULL
-        $stmt = $db->prepare("
-            SELECT 
-                COALESCE(aa.first_name, bc.first_name) as first_name,
-                COALESCE(aa.middle_name, bc.middle_name) as middle_name,
-                COALESCE(aa.last_name, bc.last_name) as last_name,
-                COALESCE(aa.date_of_birth, bc.birthday) as date_of_birth,
-                COALESCE(aa.email, bc.email) as email,
-                COALESCE(aa.phone_number, bc.contact_number) as phone_number,
-                COALESCE(aa.street_address, bc.address) as street_address,
-                aa.place_of_birth,
-                aa.gender,
-                aa.civil_status,
-                aa.nationality,
-                aa.barangay_id,
-                aa.city_id,
-                aa.province_id,
-                aa.postal_code,
-                aa.employment_status,
-                aa.employer_name,
-                aa.occupation,
-                aa.annual_income
-            FROM customer_accounts ca
-            INNER JOIN bank_customers bc ON ca.customer_id = bc.customer_id
-            LEFT JOIN account_applications aa ON bc.application_id = aa.application_id
-            WHERE ca.account_number = :account_number
-            LIMIT 1
-        ");
-        $stmt->bindParam(':account_number', $existingAccountNumber);
-        $stmt->execute();
-        $existingApplication = $stmt->fetch(PDO::FETCH_ASSOC);
-        
-        if (!$existingApplication) {
-            echo json_encode([
-                'success' => false,
-                'message' => 'Could not retrieve customer information from existing account',
-                'errors' => [
-                    'existing_account_number' => 'Unable to fetch customer data from this account'
-                ]
-            ]);
-            exit();
-        }
-    }
-
     // Handle file uploads for ID images
     $uploadDir = '../../uploads/id_images/';
     if (!is_dir($uploadDir)) {
@@ -290,115 +245,58 @@ try {
             $stmt->execute();
         }
         
-        // Create a pending account_applications record with data from existing application + new ID info
-        if ($existingApplication && $idFrontPath && $idBackPath) {
+        // Create a pending account_applications record for existing customer
+        // Only store application-specific data, personal info already exists in customer tables
+        if ($idFrontPath && $idBackPath) {
+            
+            // Map account type name to account_type_id
+            $accountTypeId = null;
+            if ($input['account_type'] === 'Savings Account') {
+                $accountTypeId = 1; // Savings
+            } elseif ($input['account_type'] === 'Checking Account') {
+                $accountTypeId = 3; // Current
+            }
+            
+            if (!$accountTypeId) {
+                throw new Exception('Invalid account type');
+            }
             
             $stmt = $db->prepare("
                 INSERT INTO account_applications (
                     application_number,
-                    application_status,
                     customer_id,
-                    first_name,
-                    middle_name,
-                    last_name,
-                    date_of_birth,
-                    place_of_birth,
-                    gender,
-                    civil_status,
-                    nationality,
-                    email,
-                    phone_number,
-                    street_address,
-                    barangay_id,
-                    city_id,
-                    province_id,
-                    postal_code,
-                    id_type,
-                    id_number,
-                    employment_status,
-                    employer_name,
-                    occupation,
-                    annual_income,
-                    account_type,
-                    terms_accepted,
-                    privacy_acknowledged,
+                    account_type_id,
+                    application_status,
+                    wants_passbook,
+                    wants_atm_card,
+                    terms_accepted_at,
+                    privacy_accepted_at,
                     submitted_at
                 ) VALUES (
                     :application_number,
-                    'pending',
                     :customer_id,
-                    :first_name,
-                    :middle_name,
-                    :last_name,
-                    :date_of_birth,
-                    :place_of_birth,
-                    :gender,
-                    :civil_status,
-                    :nationality,
-                    :email,
-                    :phone_number,
-                    :street_address,
-                    :barangay_id,
-                    :city_id,
-                    :province_id,
-                    :postal_code,
-                    :id_type,
-                    :id_number,
-                    :employment_status,
-                    :employer_name,
-                    :occupation,
-                    :annual_income,
-                    :account_type,
-                    1,
-                    1,
+                    :account_type_id,
+                    'Pending',
+                    :wants_passbook,
+                    :wants_atm_card,
+                    NOW(),
+                    NOW(),
                     NOW()
                 )
             ");
             
             $stmt->bindParam(':application_number', $applicationNumber);
             $stmt->bindParam(':customer_id', $customerId);
-            $stmt->bindValue(':first_name', $existingApplication['first_name']);
-            $stmt->bindValue(':middle_name', $existingApplication['middle_name']);
-            $stmt->bindValue(':last_name', $existingApplication['last_name']);
-            $stmt->bindValue(':date_of_birth', $existingApplication['date_of_birth'] ?? '2000-01-01');
-            $stmt->bindValue(':place_of_birth', $existingApplication['place_of_birth'] ?? 'N/A');
-            $stmt->bindValue(':gender', $existingApplication['gender'] ?? 'Other');
-            $stmt->bindValue(':civil_status', $existingApplication['civil_status'] ?? 'Single');
-            $stmt->bindValue(':nationality', $existingApplication['nationality'] ?? 'Filipino');
-            $stmt->bindValue(':email', $existingApplication['email']);
-            $stmt->bindValue(':phone_number', $existingApplication['phone_number']);
-            $stmt->bindValue(':street_address', $existingApplication['street_address']);
-            $stmt->bindValue(':barangay_id', $existingApplication['barangay_id'] ?? null);
-            $stmt->bindValue(':city_id', $existingApplication['city_id'] ?? null);
-            $stmt->bindValue(':province_id', $existingApplication['province_id'] ?? null);
-            $stmt->bindValue(':postal_code', $existingApplication['postal_code'] ?? null);
-            $stmt->bindParam(':id_type', $input['id_type']);
-            $stmt->bindParam(':id_number', $input['id_number']);
-            $stmt->bindValue(':employment_status', $existingApplication['employment_status'] ?? 'Employed');
-            $stmt->bindValue(':employer_name', $existingApplication['employer_name'] ?? 'N/A');
-            $stmt->bindValue(':occupation', $existingApplication['occupation'] ?? 'N/A');
-            $stmt->bindValue(':annual_income', $existingApplication['annual_income'] ?? 0);
-            $stmt->bindParam(':account_type', $input['account_type']);
+            $stmt->bindParam(':account_type_id', $accountTypeId, PDO::PARAM_INT);
+            $stmt->bindParam(':wants_passbook', $wantsPassbook, PDO::PARAM_INT);
+            $stmt->bindParam(':wants_atm_card', $wantsAtmCard, PDO::PARAM_INT);
             $stmt->execute();
             
             $newApplicationId = $db->lastInsertId();
             
-            // Insert ID documents into application_documents table
-            $docStmt = $db->prepare("
-                INSERT INTO application_documents (
-                    application_id,
-                    document_type,
-                    file_path,
-                    uploaded_at
-                ) VALUES 
-                (:app_id, 'id_front', :id_front, NOW()),
-                (:app_id2, 'id_back', :id_back, NOW())
-            ");
-            $docStmt->bindParam(':app_id', $newApplicationId);
-            $docStmt->bindParam(':app_id2', $newApplicationId);
-            $docStmt->bindParam(':id_front', $idFrontPath);
-            $docStmt->bindParam(':id_back', $idBackPath);
-            $docStmt->execute();
+            // Note: ID images are uploaded and stored in uploads/id_images/ folder
+            // For existing customers, these are for verification purposes only
+            // Customer's primary ID information is already in customer_ids table
         }
         
         // Commit transaction

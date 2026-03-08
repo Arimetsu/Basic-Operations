@@ -203,6 +203,7 @@ try {
                 account_id,
                 transaction_type_id,
                 amount,
+                balance_after,
                 description,
                 employee_id,
                 created_at
@@ -211,6 +212,7 @@ try {
                 :account_id,
                 :transaction_type_id,
                 :amount,
+                :balance_after,
                 :description,
                 :employee_id,
                 NOW()
@@ -226,6 +228,7 @@ try {
         $stmt->bindParam(':account_id', $account['account_id']);
         $stmt->bindParam(':transaction_type_id', $depositTypeId);
         $stmt->bindParam(':amount', $amount);
+        $stmt->bindParam(':balance_after', $newBalance);
         $stmt->bindParam(':description', $description);
         $stmt->bindParam(':employee_id', $employeeId);
         $stmt->execute();
