@@ -455,6 +455,62 @@ try {
             }
         }
         
+        // Step 3b: Handle E-Signature upload
+        if (isset($_FILES['e_signature_image']) && $_FILES['e_signature_image']['error'] === UPLOAD_ERR_OK) {
+            $sigFile = $_FILES['e_signature_image'];
+            $sigExt = pathinfo($sigFile['name'], PATHINFO_EXTENSION);
+            $sigFilename = 'e_signature_' . $customerId . '_' . time() . '.' . $sigExt;
+            $sigPath = $uploadDir . $sigFilename;
+            
+            if (move_uploaded_file($sigFile['tmp_name'], $sigPath)) {
+                $sigRelPath = 'uploads/id_images/' . $sigFilename;
+                error_log("E-Signature uploaded: " . $sigRelPath);
+                
+                $docStmt = $db->prepare("
+                    INSERT INTO application_documents 
+                    (application_id, document_type, file_name, file_path, file_size, mime_type) 
+                    VALUES (?, ?, ?, ?, ?, ?)
+                ");
+                $docStmt->execute([
+                    $applicationId,
+                    'e_signature',
+                    $sigFile['name'],
+                    $sigRelPath,
+                    $sigFile['size'],
+                    $sigFile['type']
+                ]);
+                error_log("Stored e_signature in application_documents table");
+            }
+        }
+        
+        // Step 3c: Handle Selfie photo upload
+        if (isset($_FILES['selfie_image']) && $_FILES['selfie_image']['error'] === UPLOAD_ERR_OK) {
+            $selfieFile = $_FILES['selfie_image'];
+            $selfieExt = pathinfo($selfieFile['name'], PATHINFO_EXTENSION);
+            $selfieFilename = 'selfie_' . $customerId . '_' . time() . '.' . $selfieExt;
+            $selfiePath = $uploadDir . $selfieFilename;
+            
+            if (move_uploaded_file($selfieFile['tmp_name'], $selfiePath)) {
+                $selfieRelPath = 'uploads/id_images/' . $selfieFilename;
+                error_log("Selfie photo uploaded: " . $selfieRelPath);
+                
+                $docStmt = $db->prepare("
+                    INSERT INTO application_documents 
+                    (application_id, document_type, file_name, file_path, file_size, mime_type) 
+                    VALUES (?, ?, ?, ?, ?, ?)
+                ");
+                $docStmt->execute([
+                    $applicationId,
+                    'selfie_photo',
+                    $selfieFile['name'],
+                    $selfieRelPath,
+                    $selfieFile['size'],
+                    $selfieFile['type']
+                ]);
+                error_log("Stored selfie_photo in application_documents table");
+            }
+        }
+        
         // Step 4: Link customer_id to account_applications (bidirectional linking)
         $updateStmt = $db->prepare("
             UPDATE account_applications 

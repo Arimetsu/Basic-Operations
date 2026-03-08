@@ -617,3 +617,166 @@ body {
     padding: 9px 12px;
   }
 }
+
+/* ===== E-Signature Pad ===== */
+.signature-pad-wrapper {
+  border: 2px solid #ccc;
+  border-radius: 8px;
+  background-color: #fff;
+  cursor: crosshair;
+  overflow: hidden;
+  position: relative;
+}
+
+.signature-pad-wrapper canvas {
+  display: block;
+  width: 100%;
+  height: 200px;
+  touch-action: none;
+}
+
+.signature-pad-wrapper.has-signature {
+  border-color: #1a6b62;
+}
+
+.btn-clear-signature {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background-color: white;
+  color: var(--text-dark);
+  border: 1px solid #ccc;
+  padding: 6px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.btn-clear-signature:hover {
+  background-color: #f5f5f5;
+  border-color: #dc3545;
+  color: #dc3545;
+}
+
+/* ===== Webcam / Selfie ===== */
+.webcam-wrapper {
+  position: relative;
+  border: 2px solid #ccc;
+  border-radius: 8px;
+  overflow: hidden;
+  background-color: #1a1a1a;
+  min-height: 260px;
+}
+
+.webcam-wrapper video {
+  display: block;
+  width: 100%;
+  height: 260px;
+  object-fit: cover;
+}
+
+.webcam-wrapper .selfie-preview {
+  width: 100%;
+  height: 260px;
+  object-fit: cover;
+}
+
+.webcam-wrapper.has-photo {
+  border-color: #1a6b62;
+}
+
+.webcam-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background-color: rgba(0, 0, 0, 0.6);
+  color: white;
+  font-size: 14px;
+}
+
+.webcam-overlay.hidden {
+  display: none;
+}
+
+.btn-start-camera,
+.btn-capture-photo,
+.btn-retake-photo {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.btn-start-camera {
+  background-color: var(--primary-dark);
+  color: white;
+}
+
+.btn-start-camera:hover {
+  background-color: #004d45;
+}
+
+.btn-capture-photo {
+  background-color: var(--accent-gold);
+  color: var(--text-dark);
+}
+
+.btn-capture-photo:hover:not(:disabled) {
+  background-color: #d69a39;
+}
+
+.btn-capture-photo:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-retake-photo {
+  background-color: white;
+  color: var(--text-dark);
+  border: 1px solid #ccc;
+}
+
+.btn-retake-photo:hover {
+  background-color: #f5f5f5;
+}
+
+@media (max-width: 992px) {
+  .signature-pad-wrapper canvas {
+    height: 180px;
+  }
+
+  .webcam-wrapper video,
+  .webcam-wrapper .selfie-preview {
+    height: 220px;
+  }
+
+  .webcam-wrapper {
+    min-height: 220px;
+  }
+}
+
+@media (max-width: 576px) {
+  .signature-pad-wrapper canvas {
+    height: 150px;
+  }
+
+  .webcam-wrapper video,
+  .webcam-wrapper .selfie-preview {
+    height: 200px;
+  }
+
+  .webcam-wrapper {
+    min-height: 200px;
+  }
+}

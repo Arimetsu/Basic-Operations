@@ -66,7 +66,7 @@ function setupEventListeners() {
       if (sectionId) {
         enableEditMode(
           sectionId,
-          document.querySelector(`#section-${sectionId}`)
+          document.querySelector(`#section-${sectionId}`),
         );
       } else {
         console.error("Could not find section ID");
@@ -133,7 +133,7 @@ async function loadSessionData() {
     if (!combinedData.first_name || !combinedData.last_name) {
       console.error("Missing required step 1 data");
       showGlobalError(
-        "Missing required information. Please start from the beginning."
+        "Missing required information. Please start from the beginning.",
       );
       setTimeout(() => {
         window.location.href = "customer-onboarding-details.html";
@@ -170,16 +170,16 @@ function populateReviewData(data) {
     // Map field names from Step 1 form to review display
     setFieldValue(
       "review-birth-date",
-      formatDate(data.date_of_birth || data.birth_date)
+      formatDate(data.date_of_birth || data.birth_date),
     );
     setFieldValue(
       "review-birth-place",
-      data.place_of_birth || data.birth_place
+      data.place_of_birth || data.birth_place,
     );
     setFieldValue("review-gender", data.gender);
     setFieldValue(
       "review-civil-status",
-      data.marital_status || data.civil_status
+      data.marital_status || data.civil_status,
     );
     setFieldValue("review-nationality", data.nationality);
 
@@ -215,9 +215,21 @@ function populateReviewData(data) {
     const employer = data.employer_name || "";
     setFieldValue("review-employer", employer);
 
+    // Additional financial fields
+    setFieldValue("review-job-title", data.job_title || "-");
+    setFieldValue("review-employer-address", data.employer_address || "-");
+    if (data.annual_income) {
+      setFieldValue(
+        "review-annual-income-amount",
+        formatCurrency(data.annual_income),
+      );
+    } else {
+      setFieldValue("review-annual-income-amount", "-");
+    }
+
     // Account Type
     const accountType = data.account_type || "Savings";
-    setFieldValue("review-account-type", accountType + " Account");
+    setFieldValue("review-account-type", accountType);
 
     // Document Verification - ID Type and ID Number from step 2
     setFieldValue("review-id-type", data.id_type || "-");
@@ -230,11 +242,27 @@ function populateReviewData(data) {
       setFieldValue("review-documents", "Not uploaded");
     }
 
-    // Note: Email is already set above and will be shown in Account Security section as username
+    // E-Signature preview
+    const esigImg = document.getElementById("review-esignature-img");
+    const esigNone = document.getElementById("review-esignature-none");
+    if (data.e_signature_data && esigImg) {
+      esigImg.src = data.e_signature_data;
+      esigImg.style.display = "block";
+      if (esigNone) esigNone.style.display = "none";
+    }
+
+    // Selfie photo preview
+    const selfieImg = document.getElementById("review-selfie-img");
+    const selfieNone = document.getElementById("review-selfie-none");
+    if (data.selfie_data && selfieImg) {
+      selfieImg.src = data.selfie_data;
+      selfieImg.style.display = "block";
+      if (selfieNone) selfieNone.style.display = "none";
+    }
   } catch (error) {
     console.error("Error populating review data:", error);
     showGlobalError(
-      "Error displaying your information. Some fields may be missing."
+      "Error displaying your information. Some fields may be missing.",
     );
   }
 }
@@ -249,12 +277,12 @@ async function fetchLocationNames(cityId, provinceId, barangayId) {
     // Fetch province name
     if (provinceId) {
       const provinceResponse = await fetch(
-        `${API_BASE_URL}/location/get-provinces.php`
+        `${API_BASE_URL}/location/get-provinces.php`,
       );
       const provinceResult = await provinceResponse.json();
       if (provinceResult.success && provinceResult.data) {
         const province = provinceResult.data.find(
-          (p) => p.province_id == provinceId
+          (p) => p.province_id == provinceId,
         );
         if (province) {
           setFieldValue("review-province", province.province_name);
@@ -265,7 +293,7 @@ async function fetchLocationNames(cityId, provinceId, barangayId) {
     // Fetch city name
     if (cityId) {
       const cityResponse = await fetch(
-        `${API_BASE_URL}/location/get-cities.php?province_id=${provinceId}`
+        `${API_BASE_URL}/location/get-cities.php?province_id=${provinceId}`,
       );
       const cityResult = await cityResponse.json();
       if (cityResult.success && cityResult.data) {
@@ -279,12 +307,12 @@ async function fetchLocationNames(cityId, provinceId, barangayId) {
     // Fetch barangay name
     if (barangayId && cityId) {
       const barangayResponse = await fetch(
-        `${API_BASE_URL}/location/get-barangays.php?city_id=${cityId}`
+        `${API_BASE_URL}/location/get-barangays.php?city_id=${cityId}`,
       );
       const barangayResult = await barangayResponse.json();
       if (barangayResult.success && barangayResult.data) {
         const barangay = barangayResult.data.find(
-          (b) => b.barangay_id == barangayId
+          (b) => b.barangay_id == barangayId,
         );
         if (barangay) {
           setFieldValue("review-barangay", barangay.barangay_name);
@@ -301,7 +329,7 @@ async function fetchLocationNames(cityId, provinceId, barangayId) {
  */
 async function fetchEmploymentAndFundsNames(
   employmentStatusId,
-  sourceOfFundsId
+  sourceOfFundsId,
 ) {
   try {
     const API_BASE_URL = getApiBaseUrl();
@@ -309,12 +337,12 @@ async function fetchEmploymentAndFundsNames(
     // Fetch employment status name
     if (employmentStatusId) {
       const employmentResponse = await fetch(
-        `${API_BASE_URL}/common/get-employment-statuses.php`
+        `${API_BASE_URL}/common/get-employment-statuses.php`,
       );
       const employmentResult = await employmentResponse.json();
       if (employmentResult.success && employmentResult.data) {
         const employment = employmentResult.data.find(
-          (e) => e.employment_status_id == employmentStatusId
+          (e) => e.employment_status_id == employmentStatusId,
         );
         if (employment) {
           setFieldValue("review-occupation", employment.status_name);
@@ -325,12 +353,12 @@ async function fetchEmploymentAndFundsNames(
     // Fetch source of funds name
     if (sourceOfFundsId) {
       const fundsResponse = await fetch(
-        `${API_BASE_URL}/common/get-source-of-funds.php`
+        `${API_BASE_URL}/common/get-source-of-funds.php`,
       );
       const fundsResult = await fundsResponse.json();
       if (fundsResult.success && fundsResult.data) {
         const funds = fundsResult.data.find(
-          (f) => f.source_id == sourceOfFundsId
+          (f) => f.source_id == sourceOfFundsId,
         );
         if (funds) {
           setFieldValue("review-annual-income", funds.source_name);
@@ -392,7 +420,7 @@ function formatPhoneNumber(phoneNumber) {
     if (cleaned.length >= 10) {
       return `+${cleaned.slice(0, 2)} ${cleaned.slice(2, 5)} ${cleaned.slice(
         5,
-        8
+        8,
       )} ${cleaned.slice(8)}`;
     }
   }
@@ -592,7 +620,7 @@ function enableEditMode(sectionId, section) {
           }
         })
         .catch((error) =>
-          console.error("Error loading employment statuses:", error)
+          console.error("Error loading employment statuses:", error),
         );
     } else if (id === "review-annual-income") {
       // Source of Funds dropdown - fetch from API
@@ -621,7 +649,7 @@ function enableEditMode(sectionId, section) {
           }
         })
         .catch((error) =>
-          console.error("Error loading source of funds:", error)
+          console.error("Error loading source of funds:", error),
         );
     } else if (id === "review-account-type") {
       // Account Type dropdown
@@ -667,7 +695,7 @@ function enableEditMode(sectionId, section) {
               const selectedProvinceId = this.value;
               const cityDropdown = document.getElementById("edit-review-city");
               const barangayDropdown = document.getElementById(
-                "edit-review-barangay"
+                "edit-review-barangay",
               );
 
               if (cityDropdown) {
@@ -677,7 +705,7 @@ function enableEditMode(sectionId, section) {
                   cityDropdown.disabled = false;
 
                   fetch(
-                    `${API_BASE_URL}/location/get-cities.php?province_id=${selectedProvinceId}`
+                    `${API_BASE_URL}/location/get-cities.php?province_id=${selectedProvinceId}`,
                   )
                     .then((response) => response.json())
                     .then((result) => {
@@ -693,7 +721,7 @@ function enableEditMode(sectionId, section) {
                       }
                     })
                     .catch((error) =>
-                      console.error("Error loading cities:", error)
+                      console.error("Error loading cities:", error),
                     );
                 } else {
                   cityDropdown.innerHTML =
@@ -728,7 +756,7 @@ function enableEditMode(sectionId, section) {
 
       if (provinceId) {
         fetch(
-          `${API_BASE_URL}/location/get-cities.php?province_id=${provinceId}`
+          `${API_BASE_URL}/location/get-cities.php?province_id=${provinceId}`,
         )
           .then((response) => response.json())
           .then((result) => {
@@ -748,7 +776,7 @@ function enableEditMode(sectionId, section) {
               inputElement.addEventListener("change", function () {
                 const selectedCityId = this.value;
                 const barangayDropdown = document.getElementById(
-                  "edit-review-barangay"
+                  "edit-review-barangay",
                 );
 
                 if (barangayDropdown) {
@@ -758,7 +786,7 @@ function enableEditMode(sectionId, section) {
                     barangayDropdown.disabled = false;
 
                     fetch(
-                      `${API_BASE_URL}/location/get-barangays.php?city_id=${selectedCityId}`
+                      `${API_BASE_URL}/location/get-barangays.php?city_id=${selectedCityId}`,
                     )
                       .then((response) => response.json())
                       .then((result) => {
@@ -774,7 +802,7 @@ function enableEditMode(sectionId, section) {
                         }
                       })
                       .catch((error) =>
-                        console.error("Error loading barangays:", error)
+                        console.error("Error loading barangays:", error),
                       );
                   } else {
                     barangayDropdown.innerHTML =
@@ -852,7 +880,7 @@ function enableEditMode(sectionId, section) {
           }
         })
         .catch((error) =>
-          console.error("Error loading cities for birth place:", error)
+          console.error("Error loading cities for birth place:", error),
         );
     } else if (id === "review-birth-date") {
       // Date input
@@ -944,7 +972,7 @@ async function saveSection(sectionId) {
       showSuccessMessage(
         "Please enter both password fields!",
         "error",
-        section
+        section,
       );
       return;
     }
@@ -978,7 +1006,7 @@ async function saveSection(sectionId) {
       showSuccessMessage(
         "Password must contain " + errors.join(", ") + "!",
         "error",
-        section
+        section,
       );
       return;
     }
@@ -990,7 +1018,7 @@ async function saveSection(sectionId) {
 
   // Collect new values from inputs and selects
   const inputs = section.querySelectorAll(
-    "input.form-control, input.form-control-sm, select.form-select, select.form-select-sm"
+    "input.form-control, input.form-control-sm, select.form-select, select.form-select-sm",
   );
   inputs.forEach((input) => {
     // Skip password fields as they're handled separately
@@ -1021,7 +1049,7 @@ async function saveSection(sectionId) {
         function () {
           this.classList.remove("is-invalid");
         },
-        { once: true }
+        { once: true },
       );
     } else {
       input.classList.remove("is-invalid");
@@ -1146,7 +1174,7 @@ async function saveSection(sectionId) {
     showSuccessMessage(
       "Error saving changes. Please try again.",
       "error",
-      section
+      section,
     );
   }
 }
@@ -1218,7 +1246,7 @@ function disableEditMode(sectionId, section) {
 
   // Show the original edit button again
   const editBtn = section.querySelector(
-    ".btn-edit-icon:not(.btn-save-edit):not(.btn-cancel-edit)"
+    ".btn-edit-icon:not(.btn-save-edit):not(.btn-cancel-edit)",
   );
   if (editBtn) {
     editBtn.style.display = "";
@@ -1324,7 +1352,7 @@ async function submitApplication() {
       if (value !== null && value !== undefined) {
         formData.append(
           key,
-          typeof value === "object" ? JSON.stringify(value) : value
+          typeof value === "object" ? JSON.stringify(value) : value,
         );
       }
     }
@@ -1344,7 +1372,7 @@ async function submitApplication() {
         console.log(`✅ Adding step2 field: ${key} = ${value}`);
         formData.append(
           key,
-          typeof value === "object" ? JSON.stringify(value) : value
+          typeof value === "object" ? JSON.stringify(value) : value,
         );
       }
     }
@@ -1352,24 +1380,40 @@ async function submitApplication() {
     // Convert base64 files back to Blob and add to FormData
     if (step2Parsed.id_front_data) {
       const frontBlob = await fetch(step2Parsed.id_front_data).then((r) =>
-        r.blob()
+        r.blob(),
       );
       formData.append(
         "id_front_image",
         frontBlob,
-        step2Parsed.id_front_name || "id_front.jpg"
+        step2Parsed.id_front_name || "id_front.jpg",
       );
     }
 
     if (step2Parsed.id_back_data) {
       const backBlob = await fetch(step2Parsed.id_back_data).then((r) =>
-        r.blob()
+        r.blob(),
       );
       formData.append(
         "id_back_image",
         backBlob,
-        step2Parsed.id_back_name || "id_back.jpg"
+        step2Parsed.id_back_name || "id_back.jpg",
       );
+    }
+
+    // Convert e-signature base64 to Blob and add to FormData
+    if (step2Parsed.e_signature_data) {
+      const sigBlob = await fetch(step2Parsed.e_signature_data).then((r) =>
+        r.blob(),
+      );
+      formData.append("e_signature_image", sigBlob, "e_signature.png");
+    }
+
+    // Convert selfie base64 to Blob and add to FormData
+    if (step2Parsed.selfie_data) {
+      const selfieBlob = await fetch(step2Parsed.selfie_data).then((r) =>
+        r.blob(),
+      );
+      formData.append("selfie_image", selfieBlob, "selfie.jpg");
     }
 
     console.log("Sending form data to API with files");
@@ -1387,7 +1431,7 @@ async function submitApplication() {
       const text = await response.text();
       console.error("Non-JSON response from server:", text);
       throw new Error(
-        "Server returned an error. Please check if XAMPP is running and the database is accessible."
+        "Server returned an error. Please check if XAMPP is running and the database is accessible.",
       );
     }
 
@@ -1440,7 +1484,7 @@ function showSuccessModal(accountNumber) {
   }
 
   const successModal = new bootstrap.Modal(
-    document.getElementById("successModal")
+    document.getElementById("successModal"),
   );
   successModal.show();
 }

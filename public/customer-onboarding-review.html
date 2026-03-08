@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -263,6 +263,22 @@
                         >
                       </div>
                       <div class="detail-item">
+                        <span class="label">Job Title / Position</span>
+                        <span class="value" id="review-job-title">-</span>
+                      </div>
+                      <div class="detail-item">
+                        <span class="label">Employer Address</span>
+                        <span class="value" id="review-employer-address"
+                          >-</span
+                        >
+                      </div>
+                      <div class="detail-item">
+                        <span class="label">Annual Income</span>
+                        <span class="value" id="review-annual-income-amount"
+                          >-</span
+                        >
+                      </div>
+                      <div class="detail-item">
                         <span class="label">Source of Funds</span>
                         <span class="value" id="review-annual-income"
                           >Employment</span
@@ -290,7 +306,10 @@
                       <button
                         type="button"
                         class="btn-edit-icon"
-                        onclick="window.location.href='customer-onboarding-security.html'"
+                        onclick="
+                          window.location.href =
+                            'customer-onboarding-security.html'
+                        "
                       >
                         <span>Edit</span>
                         <svg
@@ -327,6 +346,84 @@
                         <span class="value" id="review-documents"
                           >ID Front & Back</span
                         >
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Divider Line -->
+                  <div class="section-divider"></div>
+
+                  <!-- E-Signature & Selfie Section -->
+                  <div class="detail-section" id="section-esignature-selfie">
+                    <div class="section-header-inline">
+                      <h5 class="section-subtitle">E-Signature & Photo</h5>
+                      <button
+                        type="button"
+                        class="btn-edit-icon"
+                        onclick="
+                          window.location.href =
+                            'customer-onboarding-security.html'
+                        "
+                      >
+                        <span>Edit</span>
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="16"
+                          height="16"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                        >
+                          <path
+                            d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"
+                          ></path>
+                          <path
+                            d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"
+                          ></path>
+                        </svg>
+                      </button>
+                    </div>
+                    <div class="detail-list">
+                      <div class="detail-item">
+                        <span class="label">Electronic Signature</span>
+                        <span class="value" id="review-esignature">
+                          <img
+                            id="review-esignature-img"
+                            src=""
+                            alt="E-Signature"
+                            style="
+                              max-width: 280px;
+                              max-height: 120px;
+                              border: 1px solid #ddd;
+                              border-radius: 6px;
+                              background: #fff;
+                              display: none;
+                            "
+                          />
+                          <span id="review-esignature-none">Not provided</span>
+                        </span>
+                      </div>
+                      <div class="detail-item">
+                        <span class="label">Real-Time Photo</span>
+                        <span class="value" id="review-selfie">
+                          <img
+                            id="review-selfie-img"
+                            src=""
+                            alt="Selfie"
+                            style="
+                              max-width: 160px;
+                              max-height: 160px;
+                              border: 1px solid #ddd;
+                              border-radius: 6px;
+                              object-fit: cover;
+                              display: none;
+                            "
+                          />
+                          <span id="review-selfie-none">Not provided</span>
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -448,6 +545,6 @@
         }
       });
     </script>
-    <script src="../assets/js/customer-onboarding-review.js?v=9"></script
+    <script src="../assets/js/customer-onboarding-review.js?v=10"></script>
   </body>
 </html>

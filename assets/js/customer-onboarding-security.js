@@ -31,10 +31,19 @@ let uploadedFiles = {
   id_back: null,
 };
 
+// Signature & Webcam state
+let signatureCtx = null;
+let isDrawing = false;
+let signatureEmpty = true;
+let webcamStream = null;
+let selfieCaptured = false;
+
 // Initialize on page load
 document.addEventListener("DOMContentLoaded", function () {
   setupFormHandlers();
   setupFileUploadHandlers();
+  setupSignaturePad();
+  setupWebcam();
   checkSessionData();
 });
 
@@ -289,10 +298,21 @@ async function handleFormSubmit(e) {
 
     // Convert files to base64 for storage in sessionStorage
     const filePromises = [];
+    // Get signature data from canvas
+    const signatureCanvas = document.getElementById("signatureCanvas");
+    const signatureDataUrl = signatureCanvas
+      ? signatureCanvas.toDataURL("image/png")
+      : "";
+
+    // Get selfie data
+    const selfieDataUrl = document.getElementById("selfie_data").value || "";
+
     const step2Data = {
       id_type: idType,
       id_number: idNumber,
       documents_uploaded: true,
+      e_signature_data: signatureDataUrl,
+      selfie_data: selfieDataUrl,
     };
 
     if (uploadedFiles.id_front) {
@@ -306,7 +326,7 @@ async function handleFormSubmit(e) {
             resolve();
           };
           reader.readAsDataURL(uploadedFiles.id_front);
-        })
+        }),
       );
     }
 
@@ -321,7 +341,7 @@ async function handleFormSubmit(e) {
             resolve();
           };
           reader.readAsDataURL(uploadedFiles.id_back);
-        })
+        }),
       );
     }
 
@@ -375,6 +395,28 @@ function validateForm() {
     isValid = false;
   }
 
+  // Validate signature
+  if (signatureEmpty) {
+    const sigError = document.getElementById("signatureError");
+    if (sigError) sigError.style.display = "block";
+    showError("Please provide your electronic signature");
+    isValid = false;
+  } else {
+    const sigError = document.getElementById("signatureError");
+    if (sigError) sigError.style.display = "none";
+  }
+
+  // Validate selfie
+  if (!selfieCaptured) {
+    const selfieError = document.getElementById("selfieError");
+    if (selfieError) selfieError.style.display = "block";
+    showError("Please take a real-time photo");
+    isValid = false;
+  } else {
+    const selfieError = document.getElementById("selfieError");
+    if (selfieError) selfieError.style.display = "none";
+  }
+
   return isValid;
 }
 
@@ -406,7 +448,7 @@ function showFieldError(field, message) {
         errorDiv.style.display = "none";
       }
     },
-    { once: true }
+    { once: true },
   );
 }
 
@@ -469,6 +511,229 @@ function showSuccess(message) {
       document.body.removeChild(toast);
     }, 300);
   }, 3000);
+}
+
+/**
+ * Setup Signature Pad
+ */
+function setupSignaturePad() {
+  const canvas = document.getElementById("signatureCanvas");
+  if (!canvas) return;
+
+  signatureCtx = canvas.getContext("2d");
+
+  // Set canvas resolution to match display size
+  function resizeCanvas() {
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * window.devicePixelRatio;
+    canvas.height = rect.height * window.devicePixelRatio;
+    signatureCtx.scale(window.devicePixelRatio, window.devicePixelRatio);
+    signatureCtx.strokeStyle = "#003631";
+    signatureCtx.lineWidth = 2.5;
+    signatureCtx.lineCap = "round";
+    signatureCtx.lineJoin = "round";
+    signatureEmpty = true;
+  }
+
+  resizeCanvas();
+
+  // Helper to get position from mouse or touch event
+  function getPos(e) {
+    const rect = canvas.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    return { x: clientX - rect.left, y: clientY - rect.top };
+  }
+
+  // Mouse events
+  canvas.addEventListener("mousedown", function (e) {
+    isDrawing = true;
+    const pos = getPos(e);
+    signatureCtx.beginPath();
+    signatureCtx.moveTo(pos.x, pos.y);
+  });
+
+  canvas.addEventListener("mousemove", function (e) {
+    if (!isDrawing) return;
+    const pos = getPos(e);
+    signatureCtx.lineTo(pos.x, pos.y);
+    signatureCtx.stroke();
+    signatureEmpty = false;
+  });
+
+  canvas.addEventListener("mouseup", function () {
+    isDrawing = false;
+    signatureCtx.closePath();
+    if (!signatureEmpty) {
+      canvas.closest(".signature-pad-wrapper").classList.add("has-signature");
+    }
+  });
+
+  canvas.addEventListener("mouseleave", function () {
+    isDrawing = false;
+    signatureCtx.closePath();
+  });
+
+  // Touch events
+  canvas.addEventListener(
+    "touchstart",
+    function (e) {
+      e.preventDefault();
+      isDrawing = true;
+      const pos = getPos(e);
+      signatureCtx.beginPath();
+      signatureCtx.moveTo(pos.x, pos.y);
+    },
+    { passive: false },
+  );
+
+  canvas.addEventListener(
+    "touchmove",
+    function (e) {
+      e.preventDefault();
+      if (!isDrawing) return;
+      const pos = getPos(e);
+      signatureCtx.lineTo(pos.x, pos.y);
+      signatureCtx.stroke();
+      signatureEmpty = false;
+    },
+    { passive: false },
+  );
+
+  canvas.addEventListener("touchend", function () {
+    isDrawing = false;
+    signatureCtx.closePath();
+    if (!signatureEmpty) {
+      canvas.closest(".signature-pad-wrapper").classList.add("has-signature");
+    }
+  });
+
+  // Clear button
+  const clearBtn = document.getElementById("clearSignature");
+  if (clearBtn) {
+    clearBtn.addEventListener("click", function () {
+      resizeCanvas();
+      canvas
+        .closest(".signature-pad-wrapper")
+        .classList.remove("has-signature");
+      document.getElementById("e_signature_data").value = "";
+    });
+  }
+}
+
+/**
+ * Setup Webcam / Selfie Capture
+ */
+function setupWebcam() {
+  const startBtn = document.getElementById("startCamera");
+  const captureBtn = document.getElementById("capturePhoto");
+  const retakeBtn = document.getElementById("retakePhoto");
+
+  if (startBtn) {
+    startBtn.addEventListener("click", startCamera);
+  }
+  if (captureBtn) {
+    captureBtn.addEventListener("click", capturePhoto);
+  }
+  if (retakeBtn) {
+    retakeBtn.addEventListener("click", retakePhoto);
+  }
+}
+
+/**
+ * Start the webcam
+ */
+async function startCamera() {
+  const video = document.getElementById("webcamVideo");
+  const overlay = document.getElementById("webcamOverlay");
+  const startBtn = document.getElementById("startCamera");
+  const captureBtn = document.getElementById("capturePhoto");
+
+  try {
+    webcamStream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: "user",
+        width: { ideal: 640 },
+        height: { ideal: 480 },
+      },
+      audio: false,
+    });
+
+    video.srcObject = webcamStream;
+    video.style.display = "block";
+    overlay.classList.add("hidden");
+    startBtn.textContent = "Camera On";
+    startBtn.disabled = true;
+    captureBtn.disabled = false;
+  } catch (err) {
+    console.error("Camera error:", err);
+    showError(
+      "Unable to access camera. Please ensure camera permissions are granted.",
+    );
+  }
+}
+
+/**
+ * Capture a photo from the webcam
+ */
+function capturePhoto() {
+  const video = document.getElementById("webcamVideo");
+  const canvas = document.getElementById("webcamCanvas");
+  const preview = document.getElementById("selfiePreview");
+  const captureBtn = document.getElementById("capturePhoto");
+  const retakeBtn = document.getElementById("retakePhoto");
+  const wrapper = video.closest(".webcam-wrapper");
+
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(video, 0, 0);
+
+  const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+  preview.src = dataUrl;
+  preview.style.display = "block";
+  video.style.display = "none";
+
+  // Store data
+  document.getElementById("selfie_data").value = dataUrl;
+  selfieCaptured = true;
+  wrapper.classList.add("has-photo");
+
+  // Stop stream to free camera
+  if (webcamStream) {
+    webcamStream.getTracks().forEach((track) => track.stop());
+    webcamStream = null;
+  }
+
+  captureBtn.style.display = "none";
+  retakeBtn.style.display = "inline-flex";
+  document.getElementById("startCamera").disabled = true;
+}
+
+/**
+ * Retake photo
+ */
+function retakePhoto() {
+  const preview = document.getElementById("selfiePreview");
+  const captureBtn = document.getElementById("capturePhoto");
+  const retakeBtn = document.getElementById("retakePhoto");
+  const startBtn = document.getElementById("startCamera");
+  const wrapper = preview.closest(".webcam-wrapper");
+
+  preview.style.display = "none";
+  preview.src = "";
+  document.getElementById("selfie_data").value = "";
+  selfieCaptured = false;
+  wrapper.classList.remove("has-photo");
+
+  captureBtn.style.display = "inline-flex";
+  captureBtn.disabled = true;
+  retakeBtn.style.display = "none";
+  startBtn.disabled = false;
+  startBtn.textContent = "Start Camera";
+
+  // Show overlay again
+  document.getElementById("webcamOverlay").classList.remove("hidden");
 }
 
 // Add animations
