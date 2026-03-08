@@ -89,4 +89,15 @@ class Database {
     public function rollBack() {
         return $this->pdo->rollBack();
     }
+
+    // Get mysqli connection for legacy code compatibility
+    public function getConnection() {
+        $mysqli = new mysqli($this->host, $this->user, $this->pass, $this->dbname);
+        
+        if ($mysqli->connect_error) {
+            die("MySQLi connection failed: " . $mysqli->connect_error);
+        }
+        
+        return $mysqli;
+    }
 }

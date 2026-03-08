@@ -461,7 +461,9 @@ INSERT INTO `transaction_type` (`transaction_type_id`, `type_name`, `description
 (4, 'Interest', 'Interest credited to account'),
 (5, 'Fee', 'Service fee charged'),
 (6, 'Loan Payment', 'Payment towards loan'),
-(7, 'Loan Disbursement', 'Loan amount credited');
+(7, 'Loan Disbursement', 'Loan amount credited'),
+(8, 'Transfer Out', 'Money sent to another account'),
+(9, 'Transfer In', 'Money received from another account');
 
 -- --------------------------------------------------------
 
@@ -730,7 +732,7 @@ ALTER TABLE `transaction`
 -- AUTO_INCREMENT for table `transaction_type`
 --
 ALTER TABLE `transaction_type`
-  MODIFY `transaction_type_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
+  MODIFY `transaction_type_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
 
 --
 -- Constraints for dumped tables

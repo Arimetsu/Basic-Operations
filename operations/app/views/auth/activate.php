@@ -1,5 +1,5 @@
 <?php
-session_start();
+// Session is already started by the framework
 
 // Clear any existing activation session
 if (!isset($_POST['verify_account']) && !isset($_GET['continue'])) {
@@ -11,23 +11,9 @@ if (!isset($_POST['verify_account']) && !isset($_GET['continue'])) {
     unset($_SESSION['otp_activation_verified']);
 }
 
-// Include database connection
-require_once $_SERVER['DOCUMENT_ROOT'] . '/Evergreen/bank-system/evergreen-marketing/db_connect.php';
-
-// Define URLROOT if not defined
-if (!defined('URLROOT')) {
-    $protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http';
-    $host = $_SERVER['HTTP_HOST'];
-    define('URLROOT', $protocol . '://' . $host . '/Evergreen/bank-system/Basic-operation/operations/public');
-}
-
 // Include PHPMailer
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
-
-require_once $_SERVER['DOCUMENT_ROOT'] . '/Evergreen/bank-system/evergreen-marketing/PHPMailer-7.0.0/src/Exception.php';
-require_once $_SERVER['DOCUMENT_ROOT'] . '/Evergreen/bank-system/evergreen-marketing/PHPMailer-7.0.0/src/PHPMailer.php';
-require_once $_SERVER['DOCUMENT_ROOT'] . '/Evergreen/bank-system/evergreen-marketing/PHPMailer-7.0.0/src/SMTP.php';
 
 $error = "";
 $step = 1; // Step 1: Verify account and email, send OTP
@@ -39,15 +25,20 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['verify_account'])) {
     if (empty($account_number) || empty($email)) {
         $error = "Please fill in all fields.";
     } else {
+        // Get database connection through the model
+        require_once ROOT_PATH . '/core/Database.php';
+        $db = new Database();
+        $conn = $db->getConnection();
+        
         // Check if account exists and belongs to customer with this email
         $sql = "SELECT 
                     c.customer_id,
                     c.first_name,
                     c.password_hash,
                     a.account_number
-                FROM Customers c
-                INNER JOIN Accounts a ON c.customer_id = a.customer_id
-                INNER JOIN Emails e ON c.customer_id = e.customer_id
+                FROM customers c
+                INNER JOIN accounts a ON c.customer_id = a.customer_id
+                INNER JOIN emails e ON c.customer_id = e.customer_id
                 WHERE a.account_number = ? 
                 AND e.email = ?
                 AND e.is_active = 1
@@ -62,8 +53,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['verify_account'])) {
         if (!$result) {
             $error = "Account number and email do not match our records.";
         } elseif (!empty($result->password_hash)) {
-            // User already has a password, redirect to forgot password
-            $error = "This account already has online banking activated. Please use <a href='" . URLROOT . "/auth/login' class='text-decoration-none fw-bold' style='color: #bba27bff;'>Login</a> or <a href='../../../../../evergreen-marketing/forgotpassword.php' class='text-decoration-none fw-bold' style='color: #bba27bff;'>Forgot Password</a>.";
+            // User already has a password, redirect to login
+            $error = "This account already has online banking activated. Please use <a href='" . URLROOT . "/auth/login' class='text-decoration-none fw-bold' style='color: #003631;'>Login</a>.";
         } else {
             // Generate 6-digit OTP
             $otp = sprintf("%06d", mt_rand(0, 999999));
@@ -115,11 +106,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['verify_account'])) {
                 
                 $mail->send();
                 
-                // Redirect to OTP verification page (direct file path, not through router)
-                $protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http';
-                $host = $_SERVER['HTTP_HOST'];
-                $verifyPath = '/Evergreen/bank-system/Basic-operation/operations/app/views/auth/activate_verify.php';
-                header('Location: ' . $protocol . '://' . $host . $verifyPath);
+                // Redirect to OTP verification page
+                header('Location: ' . URLROOT . '/auth/activateVerify');
                 exit();
                 
             } catch (Exception $e) {
@@ -134,12 +122,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['verify_account'])) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Activate Online Banking - Evergreen Bank</title>
+    <title>Activate Online Banking - Evergreen</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     <style>
         body {
-            background: #f8f9fa;
+            background: linear-gradient(135deg, #003631 0%, #006b5e 100%);
             min-height: 100vh;
             display: flex;
             align-items: center;
@@ -149,89 +137,107 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['verify_account'])) {
         }
         .activation-card {
             background: white;
-            border-radius: 12px;
-            box-shadow: 0 2px 20px rgba(0, 0, 0, 0.08);
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
             max-width: 450px;
             width: 100%;
-            border: 1px solid #e9ecef;
+            padding: 40px;
+            animation: fadeInUp 0.6s ease-out;
         }
+        
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
         .card-header-custom {
-            background: white;
-            border-bottom: 2px solid #003631;
-            padding: 30px 30px 20px;
             text-align: center;
+            margin-bottom: 30px;
         }
+        
+        .card-header-custom img {
+            filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.1));
+        }
+        
         .card-body-custom {
-            padding: 25px 30px 30px;
+            padding: 0;
         }
+        .form-control {
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            padding: 12px 16px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+        
         .form-control:focus {
             border-color: #003631;
             box-shadow: 0 0 0 0.2rem rgba(0, 54, 49, 0.15);
         }
         .btn-activate {
-            background: #003631;
+            background: linear-gradient(135deg, #003631 0%, #006b5e 100%);
             border: none;
             color: white;
-            padding: 10px;
+            padding: 12px;
             font-weight: 600;
-            border-radius: 6px;
-            transition: all 0.2s;
+            border-radius: 10px;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
         }
+        
         .btn-activate:hover {
-            background: #004d45;
+            background: linear-gradient(135deg, #004d45 0%, #007a6b 100%);
             color: white;
-        }
-        .icon-circle {
-            width: 60px;
-            height: 60px;
-            background: #e8f5f3;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0 auto 15px;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0, 54, 49, 0.3);
         }
         .link-custom {
             color: #003631;
             text-decoration: none;
             font-weight: 500;
             font-size: 14px;
+            transition: color 0.2s ease;
         }
+        
         .link-custom:hover {
-            color: #004d45;
+            color: #006b5e;
             text-decoration: underline;
         }
         h2 {
             color: #003631;
-            font-size: 24px;
+            font-size: 28px;
             font-weight: 700;
-            margin-bottom: 8px;
+            margin-bottom: 5px;
+            letter-spacing: 1px;
         }
+        
         .subtitle {
-            color: #6c757d;
+            color: #666;
             font-size: 14px;
             margin-bottom: 0;
         }
         .form-label {
+            color: #333;
+            font-weight: 500;
             font-size: 14px;
-            font-weight: 600;
-            color: #495057;
+            margin-bottom: 8px;
         }
-        .form-control {
-            font-size: 14px;
-            padding: 10px 12px;
-        }
+        
         .form-text {
             font-size: 12px;
+            color: #6c757d;
         }
     </style>
 </head>
 <body>
     <div class="activation-card">
         <div class="card-header-custom">
-            <div class="icon-circle">
-                <i class="bi bi-shield-lock-fill" style="font-size: 28px; color: #003631;"></i>
-            </div>
+            <img src="<?= URLROOT; ?>/img/logo.png" alt="Evergreen Logo" width="60" height="60" style="margin-bottom: 15px;">
             <h2>Activate Online Banking</h2>
             <p class="subtitle">Secure access to your accounts</p>
         </div>
@@ -283,7 +289,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['verify_account'])) {
             
             <div class="text-center mt-3 pt-3 border-top">
                 <p class="mb-2 text-muted" style="font-size: 13px;">Already activated?</p>
-                <a href="../../../../../evergreen-marketing/login.php" class="link-custom">
+                <a href="<?= URLROOT; ?>/auth/login" class="link-custom">
                     <i class="bi bi-box-arrow-in-right me-1"></i>Login to your account
                 </a>
             </div>

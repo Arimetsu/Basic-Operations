@@ -39,11 +39,13 @@
         margin-bottom: 5px;
         position: relative;
         z-index: 1;
+        transition: all 0.3s ease;
     }
     .step.active .step-circle {
         background: #198754;
         color: white;
         box-shadow: 0 2px 8px rgba(25, 135, 84, 0.3);
+        transform: scale(1.1);
     }
     .step.completed .step-circle {
         background: #198754;
@@ -56,15 +58,87 @@
     }
     .step-content {
         display: none;
+        opacity: 0;
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        width: 100%;
     }
     .step-content.active {
         display: block;
+        position: relative;
+        opacity: 1;
+    }
+    .step-content.slide-out-left {
+        display: block;
+        animation: slideOutLeft 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55) forwards;
+    }
+    .step-content.slide-out-right {
+        display: block;
+        animation: slideOutRight 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55) forwards;
+    }
+    .step-content.slide-in-left {
+        display: block;
+        animation: slideInLeft 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55) forwards;
+    }
+    .step-content.slide-in-right {
+        display: block;
+        animation: slideInRight 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55) forwards;
+    }
+    
+    @keyframes slideInRight {
+        0% {
+            opacity: 0;
+            transform: translateX(100px) scale(0.95);
+        }
+        100% {
+            opacity: 1;
+            transform: translateX(0) scale(1);
+        }
+    }
+    
+    @keyframes slideInLeft {
+        0% {
+            opacity: 0;
+            transform: translateX(-100px) scale(0.95);
+        }
+        100% {
+            opacity: 1;
+            transform: translateX(0) scale(1);
+        }
+    }
+    
+    @keyframes slideOutLeft {
+        0% {
+            opacity: 1;
+            transform: translateX(0) scale(1);
+        }
+        100% {
+            opacity: 0;
+            transform: translateX(-100px) scale(0.95);
+        }
+    }
+    
+    @keyframes slideOutRight {
+        0% {
+            opacity: 1;
+            transform: translateX(0) scale(1);
+        }
+        100% {
+            opacity: 0;
+            transform: translateX(100px) scale(0.95);
+        }
     }
     .form-section {
         background: white;
         padding: 30px;
         border-radius: 8px;
         box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    .form-container {
+        position: relative;
+        min-height: 500px;
     }
     .section-title {
         font-size: 24px;
@@ -228,7 +302,7 @@
     <?php endif; ?>
 
     <form id="signupForm" action="<?= URLROOT; ?>/auth/signup" method="POST" enctype="multipart/form-data">
-        
+        <div class="form-container">
         <!-- Step 1: Personal Details -->
         <div class="step-content active" data-step="1">
             <div class="form-section">
@@ -394,7 +468,8 @@
                     <label class="form-label">Annual Income Range *</label>
                     <select name="income_range" class="form-control" required>
                         <option value="">Select Range</option>
-                        <option value="Below 250,000" <?= (($data['income_range'] ?? '') == 'Below 250,000') ? 'selected' : '' ?>>Below ₱250,000</option>
+                        <option value="Below 100,000" <?= (($data['income_range'] ?? '') == 'Below 100,000') ? 'selected' : '' ?>>Below ₱100,000</option>
+                        <option value="100,000 - 250,000" <?= (($data['income_range'] ?? '') == '100,000 - 250,000') ? 'selected' : '' ?>>₱100,000 - ₱250,000</option>
                         <option value="250,000 - 500,000" <?= (($data['income_range'] ?? '') == '250,000 - 500,000') ? 'selected' : '' ?>>₱250,000 - ₱500,000</option>
                         <option value="500,000 - 1,000,000" <?= (($data['income_range'] ?? '') == '500,000 - 1,000,000') ? 'selected' : '' ?>>₱500,000 - ₱1,000,000</option>
                         <option value="Above 1,000,000" <?= (($data['income_range'] ?? '') == 'Above 1,000,000') ? 'selected' : '' ?>>Above ₱1,000,000</option>
@@ -641,6 +716,7 @@
                     </div>
                 </div>
             </div>
+        </div>
         </div>
 
         <!-- Navigation Buttons -->
@@ -928,32 +1004,59 @@ function changeStep(direction) {
         }
     }
     
-    // Hide current step
+    // Determine animation direction
+    const isGoingForward = direction > 0;
+    const outClass = isGoingForward ? 'slide-out-left' : 'slide-out-right';
+    const inClass = isGoingForward ? 'slide-in-right' : 'slide-in-left';
+    
+    // Update step number
+    const nextStep = currentStep + direction;
+    
+    // Get next step content
+    const newStepContent = document.querySelector(`.step-content[data-step="${nextStep}"]`);
+    
+    // Start both animations simultaneously
     currentStepContent.classList.remove('active');
+    currentStepContent.classList.add(outClass);
+    newStepContent.classList.add(inClass);
+    
+    // Update step indicators
     document.querySelector(`.step[data-step="${currentStep}"]`).classList.remove('active');
     if (direction > 0) {
         document.querySelector(`.step[data-step="${currentStep}"]`).classList.add('completed');
     }
+    document.querySelector(`.step[data-step="${nextStep}"]`).classList.add('active');
     
-    // Update step number
-    currentStep += direction;
+    // Update current step variable
+    currentStep = nextStep;
     
-    // Show new step
-    document.querySelector(`.step-content[data-step="${currentStep}"]`).classList.add('active');
-    document.querySelector(`.step[data-step="${currentStep}"]`).classList.add('active');
-    
-    // Update buttons
-    document.getElementById('prevBtn').style.display = currentStep === 1 ? 'none' : 'block';
-    document.getElementById('nextBtn').style.display = currentStep === totalSteps ? 'none' : 'block';
-    document.getElementById('submitBtn').style.display = currentStep === totalSteps ? 'block' : 'none';
-    
-    // If on review step, populate review
-    if (currentStep === 8) {
-        populateReview();
-    }
-    
-    // Scroll to top
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    // Clean up after animation completes
+    setTimeout(() => {
+        // Remove animation classes and clean up old step
+        document.querySelectorAll('.step-content').forEach(step => {
+            step.classList.remove('slide-out-left', 'slide-out-right', 'slide-in-left', 'slide-in-right');
+            if (!step.classList.contains('active') && step.getAttribute('data-step') != currentStep) {
+                step.style.display = 'none';
+            }
+        });
+        
+        // Make new step fully active
+        newStepContent.classList.add('active');
+        newStepContent.style.display = 'block';
+        
+        // Update buttons
+        document.getElementById('prevBtn').style.display = currentStep === 1 ? 'none' : 'block';
+        document.getElementById('nextBtn').style.display = currentStep === totalSteps ? 'none' : 'block';
+        document.getElementById('submitBtn').style.display = currentStep === totalSteps ? 'block' : 'none';
+        
+        // If on review step, populate review
+        if (currentStep === 8) {
+            populateReview();
+        }
+        
+        // Scroll to top
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }, 650);
 }
 
 function populateReview() {
