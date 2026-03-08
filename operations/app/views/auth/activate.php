@@ -36,8 +36,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['verify_account'])) {
                     c.first_name,
                     c.password_hash,
                     a.account_number
-                FROM customers c
-                INNER JOIN accounts a ON c.customer_id = a.customer_id
+                FROM bank_customers c
+                INNER JOIN customer_accounts a ON c.customer_id = a.customer_id
                 INNER JOIN emails e ON c.customer_id = e.customer_id
                 WHERE a.account_number = ? 
                 AND e.email = ?

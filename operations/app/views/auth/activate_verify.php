@@ -62,7 +62,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         // Resend OTP logic
         
         // Get customer details
-        $sql = "SELECT first_name FROM Customers WHERE customer_id = ?";
+        $sql = "SELECT first_name FROM bank_customers WHERE customer_id = ?";
         $stmt = $conn->prepare($sql);
         $stmt->bind_param('i', $_SESSION['activation_customer_id']);
         $stmt->execute();

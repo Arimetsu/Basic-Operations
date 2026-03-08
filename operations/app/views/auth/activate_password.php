@@ -39,7 +39,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['set_password'])) {
         $password_hash = password_hash($password, PASSWORD_DEFAULT);
         
         // Update customer password
-        $sql = "UPDATE Customers SET password_hash = ? WHERE customer_id = ?";
+        $sql = "UPDATE bank_customers SET password_hash = ? WHERE customer_id = ?";
         $stmt = $conn->prepare($sql);
         $stmt->bind_param('si', $password_hash, $_SESSION['activation_customer_id']);
         

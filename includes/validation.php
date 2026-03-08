@@ -384,7 +384,7 @@ function validatePasswordConfirmation($password, $confirmPassword) {
  */
 function checkUsernameExists($pdo, $username, $excludeCustomerId = null) {
     try {
-        $sql = "SELECT COUNT(*) as count FROM customers WHERE customer_username = :username";
+        $sql = "SELECT COUNT(*) as count FROM bank_customers WHERE customer_username = :username";
         if ($excludeCustomerId) {
             $sql .= " AND customer_id != :customer_id";
         }

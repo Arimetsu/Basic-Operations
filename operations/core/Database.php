@@ -10,7 +10,7 @@ class Database {
 
     public function __construct() {
         $this->host = $_ENV['DB_HOST'] ?? 'localhost';
-        $this->dbname = $_ENV['DB_NAME'] ?? 'basic-operation'; 
+        $this->dbname = $_ENV['DB_NAME'] ?? 'bankingdb'; 
         $this->user = $_ENV['DB_USER'] ?? 'root';
         $this->pass = $_ENV['DB_PASS'] ?? '';
 

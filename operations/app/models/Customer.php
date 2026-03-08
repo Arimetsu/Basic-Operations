@@ -19,11 +19,11 @@ class Customer extends Database{
                 c.password_hash,
                 a.account_number
             FROM
-                Customers c
+                bank_customers c
             LEFT JOIN
                 Emails e ON c.customer_id = e.customer_id AND e.is_primary = 1 AND e.is_active = 1
             LEFT JOIN
-                Accounts a ON c.customer_id = a.customer_id AND a.is_active = 1
+                customer_accounts a ON c.customer_id = a.customer_id AND a.is_active = 1
             WHERE
                 e.email = :emailIdentifier OR a.account_number = :accountIdentifier
             LIMIT 1;
@@ -86,11 +86,11 @@ class Customer extends Database{
                         ELSE 0
                     END
                 ), 0) AS current_balance
-            FROM Accounts a
-            LEFT JOIN Customers c ON c.customer_id = a.customer_id
-            LEFT JOIN Account_Types act ON a.account_type_id = act.account_type_id
-            LEFT JOIN Transaction t ON a.account_id = t.account_id
-            LEFT JOIN Transaction_Type tt ON t.transaction_type_id = tt.transaction_type_id
+            FROM customer_accounts a
+            LEFT JOIN bank_customers c ON c.customer_id = a.customer_id
+            LEFT JOIN bank_account_types act ON a.account_type_id = act.account_type_id
+            LEFT JOIN bank_transactions t ON a.account_id = t.account_id
+            LEFT JOIN transaction_types tt ON t.transaction_type_id = tt.transaction_type_id
             WHERE a.customer_id = :customer_id
             AND a.is_active = 1
             AND (a.is_locked = 0 OR a.is_locked IS NULL)
@@ -126,8 +126,8 @@ class Customer extends Database{
                     t.description,
                     tt.type_name AS transaction_type_name,
                     t.created_at
-                FROM Transaction t
-                JOIN Transaction_Type tt ON t.transaction_type_id = tt.transaction_type_id
+                FROM bank_transactions t
+                JOIN transaction_types tt ON t.transaction_type_id = tt.transaction_type_id
                 WHERE t.account_id = :account_id
                 ORDER BY t.created_at DESC
                 LIMIT 3
@@ -140,19 +140,19 @@ class Customer extends Database{
     }
 
     public function getAccountById($id) {
-        $this->db->query('SELECT * FROM Accounts WHERE account_id = :id');
+        $this->db->query('SELECT * FROM customer_accounts WHERE account_id = :id');
         $this->db->bind(':id', $id);
         return $this->db->single();
     }
 
     public function deleteAccountById($id) {
-        $this->db->query('UPDATE Accounts SET is_active = 0, archived_at = NOW() WHERE account_id = :id');
+        $this->db->query('UPDATE customer_accounts SET is_active = 0, archived_at = NOW() WHERE account_id = :id');
         $this->db->bind(':id', $id);
         return $this->db->execute();
     }
 
     public function toggleAccountVisibility($account_id, $is_hidden) {
-        $this->db->query('UPDATE Accounts SET is_hidden = :is_hidden, hidden_at = :hidden_at WHERE account_id = :account_id');
+        $this->db->query('UPDATE customer_accounts SET is_hidden = :is_hidden, hidden_at = :hidden_at WHERE account_id = :account_id');
         $this->db->bind(':account_id', $account_id);
         $this->db->bind(':is_hidden', $is_hidden);
         $this->db->bind(':hidden_at', $is_hidden ? date('Y-m-d H:i:s') : null);
@@ -174,7 +174,7 @@ class Customer extends Database{
         // Step 1: Get account_id and account_type by account_number AND VERIFY IT BELONGS TO THE CUSTOMER
         $this->db->query("
             SELECT a.account_id, a.account_type_id, a.customer_id, a.is_active, a.is_locked
-            FROM Accounts a
+            FROM customer_accounts a
             WHERE a.account_number = :account_number
         ");
         $this->db->bind(':account_number', $data['account_number']);
@@ -197,7 +197,7 @@ class Customer extends Database{
         // Auto-activate account if it's inactive but not locked
         if ((int)$account->is_active !== 1) {
             $this->db->query("
-                UPDATE Accounts 
+                UPDATE customer_accounts 
                 SET is_active = 1 
                 WHERE account_id = :account_id
             ");
@@ -208,7 +208,7 @@ class Customer extends Database{
         // Step 2: Verify account type matches user input
         $this->db->query("
             SELECT account_type_id, type_name 
-            FROM Account_Types 
+            FROM bank_account_types 
             WHERE type_name = :account_type
         ");
         $this->db->bind(':account_type', $data['account_type']);
@@ -220,7 +220,7 @@ class Customer extends Database{
 
         if ((int)$account->account_type_id !== (int)$type->account_type_id) {
             // Get the actual account type name for better error message
-            $this->db->query("SELECT type_name FROM Account_Types WHERE account_type_id = :id");
+            $this->db->query("SELECT type_name FROM bank_account_types WHERE account_type_id = :id");
             $this->db->bind(':id', $account->account_type_id);
             $actualType = $this->db->single();
             $actualTypeName = $actualType ? $actualType->type_name : 'Unknown';
@@ -280,7 +280,7 @@ class Customer extends Database{
     // -- CREATING ACCOUNT
     public function getAccountTypes(){
         // Limiting to IDs 1 and 2 based on the user's explicit requirement for Savings and Checking only.
-        $this->db->query("SELECT account_type_id, type_name FROM Account_Types WHERE account_type_id IN (1, 2) ORDER BY account_type_id ASC");
+        $this->db->query("SELECT account_type_id, type_name FROM bank_account_types WHERE account_type_id IN (1, 2) ORDER BY account_type_id ASC");
         return $this->db->resultSet(); 
     }
 
@@ -293,7 +293,7 @@ class Customer extends Database{
         $interest_rate = ($account_type_id == 1) ? 0.50 : NULL;
 
         $this->db->query("
-            INSERT INTO Accounts 
+            INSERT INTO customer_accounts 
                 (customer_id, account_number, account_type_id, interest_rate, is_locked, created_at)
             VALUES 
                 (:customer_id, :account_number, :account_type_id, :interest_rate, 0, NOW())
@@ -346,7 +346,7 @@ class Customer extends Database{
             $account_number = "{$prefix}-{$unique_digits}-{$current_year}";
             
             // Check if account number already exists
-            $this->db->query("SELECT COUNT(*) as count FROM Accounts WHERE account_number = :account_number");
+            $this->db->query("SELECT COUNT(*) as count FROM customer_accounts WHERE account_number = :account_number");
             $this->db->bind(':account_number', $account_number);
             $result = $this->db->single();
             
@@ -388,13 +388,13 @@ class Customer extends Database{
                 p.province_name,
                 -- Legacy concatenated field for compatibility
                 CONCAT_WS(', ', a.address_line, br.barangay_name, ct.city_name, p.province_name, 'Philippines') AS home_address
-            FROM Customers c
+            FROM bank_customers c
             LEFT JOIN Customer_Profile cp ON c.customer_id = cp.customer_id
             LEFT JOIN Gender g ON cp.gender_id = g.gender_id
             LEFT JOIN Addresses a ON c.customer_id = a.customer_id AND a.is_primary = 1 AND a.is_active = 1
-            LEFT JOIN Barangay br ON a.barangay_id = br.barangay_id
-            LEFT JOIN City ct ON a.city_id = ct.city_id
-            LEFT JOIN Province p ON a.province_id = p.province_id
+            LEFT JOIN barangays br ON a.barangay_id = br.barangay_id
+            LEFT JOIN cities ct ON a.city_id = ct.city_id
+            LEFT JOIN provinces p ON a.province_id = p.province_id
             WHERE c.customer_id = :customer_id;
         ");
         
@@ -408,7 +408,7 @@ class Customer extends Database{
      * @return array
      */
     public function getProvinces() {
-        $this->db->query("SELECT province_id, province_name FROM Province ORDER BY province_name ASC");
+        $this->db->query("SELECT province_id, province_name FROM provinces ORDER BY province_name ASC");
         return $this->db->resultSet();
     }
 
@@ -418,7 +418,7 @@ class Customer extends Database{
      * @return array
      */
     public function getCitiesByProvince($province_id) {
-        $this->db->query("SELECT city_id, city_name, province_id FROM City WHERE province_id = :province_id ORDER BY city_name ASC");
+        $this->db->query("SELECT city_id, city_name, province_id FROM cities WHERE province_id = :province_id ORDER BY city_name ASC");
         $this->db->bind(':province_id', $province_id);
         return $this->db->resultSet();
     }
@@ -429,7 +429,7 @@ class Customer extends Database{
      * @return array
      */
     public function getBarangaysByCity($city_id) {
-        $this->db->query("SELECT barangay_id, barangay_name, city_id FROM Barangay WHERE city_id = :city_id ORDER BY barangay_name ASC");
+        $this->db->query("SELECT barangay_id, barangay_name, city_id FROM barangays WHERE city_id = :city_id ORDER BY barangay_name ASC");
         $this->db->bind(':city_id', $city_id);
         return $this->db->resultSet();
     }
@@ -439,7 +439,7 @@ class Customer extends Database{
      * @return array
      */
     public function getAllCities() {
-        $this->db->query("SELECT city_id, city_name, province_id FROM City ORDER BY city_name ASC");
+        $this->db->query("SELECT city_id, city_name, province_id FROM cities ORDER BY city_name ASC");
         return $this->db->resultSet();
     }
 
@@ -750,7 +750,7 @@ class Customer extends Database{
      * @return array
      */
     public function getAllAccountsForMaintainingProcessing() {
-        $this->db->query("SELECT account_id, account_number, customer_id FROM Accounts WHERE is_active = 1");
+        $this->db->query("SELECT account_id, account_number, customer_id FROM customer_accounts WHERE is_active = 1");
         return $this->db->resultSet();
     }
 
@@ -758,7 +758,7 @@ class Customer extends Database{
      * Get transaction_type_id by name
      */
     public function getTransactionTypeId($type_name) {
-        $this->db->query("SELECT transaction_type_id FROM Transaction_Type WHERE type_name = :type_name LIMIT 1");
+        $this->db->query("SELECT transaction_type_id FROM transaction_types WHERE type_name = :type_name LIMIT 1");
         $this->db->bind(':type_name', $type_name);
         $row = $this->db->single();
         return $row ? (int)$row->transaction_type_id : null;
@@ -781,7 +781,7 @@ class Customer extends Database{
         $balance_after = $balance_before - $fee_amount; // Service charge reduces balance
 
         // Insert Transaction record for the fee (debit)
-        $this->db->query("INSERT INTO Transaction (transaction_ref, account_id, transaction_type_id, amount, balance_after, description, created_at) VALUES (:transaction_ref, :account_id, :type_id, :amount, :balance_after, :description, NOW())");
+        $this->db->query("INSERT INTO bank_transactions (transaction_ref, account_id, transaction_type_id, amount, balance_after, description, created_at) VALUES (:transaction_ref, :account_id, :type_id, :amount, :balance_after, :description, NOW())");
         $this->db->bind(':transaction_ref', $transaction_ref);
         $this->db->bind(':account_id', $account_id);
         $this->db->bind(':type_id', $transactionTypeId);
@@ -810,7 +810,7 @@ class Customer extends Database{
      */
     public function setAccountStatus($account_id, $new_status, $balance_at_change = 0.00, $reason = null, $changed_by = null, $extraFields = []) {
         // fetch previous status
-        $this->db->query("SELECT is_active FROM Accounts WHERE account_id = :account_id LIMIT 1");
+        $this->db->query("SELECT is_active FROM customer_accounts WHERE account_id = :account_id LIMIT 1");
         $this->db->bind(':account_id', $account_id);
         $prev = $this->db->single();
         $previous_status = $prev ? $prev->account_status : null;
@@ -833,7 +833,7 @@ class Customer extends Database{
         $updates[] = "account_status = :account_status";
         $params[':account_status'] = $new_status;
 
-        $sql = "UPDATE Accounts SET " . implode(', ', $updates) . " WHERE account_id = :account_id";
+        $sql = "UPDATE customer_accounts SET " . implode(', ', $updates) . " WHERE account_id = :account_id";
         $this->db->query($sql);
         foreach ($params as $k => $v) {
             $this->db->bind($k, $v);
@@ -858,7 +858,7 @@ class Customer extends Database{
      * @return array
      */
     public function getAllBarangays() {
-        $this->db->query("SELECT barangay_id, barangay_name, city_id FROM Barangay ORDER BY barangay_name ASC");
+        $this->db->query("SELECT barangay_id, barangay_name, city_id FROM barangays ORDER BY barangay_name ASC");
         return $this->db->resultSet();
     }
 
@@ -866,7 +866,7 @@ class Customer extends Database{
     public function getCurrentPasswordHash($user_id){
         $this->db->query("
             SELECT password_hash
-            FROM Customers
+            FROM bank_customers
             WHERE customer_id = :id;
         ");
         $this->db->bind(':id', $user_id);
@@ -876,7 +876,7 @@ class Customer extends Database{
 
     public function updatePassword($user_id, $new_password_hash){
         $this->db->query("
-            UPDATE Customers
+            UPDATE bank_customers
             SET password_hash = :new_password_hash
             WHERE customer_id = :id;
         ");
@@ -1110,7 +1110,7 @@ class Customer extends Database{
     public function getAccountByNumber($account_number){
         $this->db->query("
             SELECT *
-            FROM Accounts
+            FROM customer_accounts
             WHERE account_number = :account_number;
         ");
 
@@ -1125,9 +1125,9 @@ class Customer extends Database{
                 CONCAT_WS(' ', c.first_name, c.last_name) AS customer_name,
                 c.customer_id
             FROM 
-                Accounts a
+                customer_accounts a
             INNER JOIN 
-                Customers c ON a.customer_id = c.customer_id
+                bank_customers c ON a.customer_id = c.customer_id
             WHERE 
                 a.account_number = :recipient_number
                 AND a.is_active = 1;
@@ -1172,11 +1172,11 @@ class Customer extends Database{
                     END
                 ), 0) AS balance
             FROM 
-                Accounts a
+                customer_accounts a
             LEFT JOIN 
                 Transaction t ON a.account_id = t.account_id
             LEFT JOIN 
-                Transaction_Type tt ON t.transaction_type_id = tt.transaction_type_id
+                transaction_types tt ON t.transaction_type_id = tt.transaction_type_id
             WHERE 
                 a.account_number = :account_number
                 AND a.is_active = 1
@@ -1198,7 +1198,7 @@ class Customer extends Database{
         // for sender (Transfer Out - subtract amount)
         $senderBalanceAfter = $senderCurrentBalance - $amount;
         $this->db->query("
-        INSERT INTO Transaction (
+        INSERT INTO bank_transactions (
             transaction_ref,
             account_id,
             transaction_type_id,
@@ -1219,7 +1219,7 @@ class Customer extends Database{
         ");
         $this->db->bind(':transaction_ref', $transaction_ref);
         $this->db->bind(':sender', $sender);
-        $this->db->bind(':transaction_type', 8);
+        $this->db->bind(':transaction_type', 9); // Transfer Out
         $this->db->bind(':amount', $amount);
         $this->db->bind(':receiver', $receiver);
         $this->db->bind(':balance_after', $senderBalanceAfter);
@@ -1230,7 +1230,7 @@ class Customer extends Database{
         if ($fee > 0) {
             $senderBalanceAfter = $senderBalanceAfter - $fee; // Subtract fee from balance
             $this->db->query("
-            INSERT INTO Transaction (
+            INSERT INTO bank_transactions (
                 account_id,
                 transaction_type_id,
                 amount,
@@ -1256,7 +1256,7 @@ class Customer extends Database{
         // for the receiver (Transfer In - add amount)
         $receiverBalanceAfter = $receiverCurrentBalance + $amount;
         $this->db->query("
-        INSERT INTO Transaction (
+        INSERT INTO bank_transactions (
             account_id,
             transaction_type_id,
             amount,
@@ -1274,7 +1274,7 @@ class Customer extends Database{
         );
         ");
         $this->db->bind(':sender', $receiver);
-        $this->db->bind(':transaction_type', 9);
+        $this->db->bind(':transaction_type', 8); // Transfer In
         $this->db->bind(':amount', $amount);
         $this->db->bind(':receiver', $sender);
         $this->db->bind(':balance_after', $receiverBalanceAfter);
@@ -1289,7 +1289,7 @@ class Customer extends Database{
         // for sender (debit only - no receiver credit for external transfer)
         $senderBalanceAfter = $senderCurrentBalance - $amount;
         $this->db->query("
-        INSERT INTO Transaction (
+        INSERT INTO bank_transactions (
             transaction_ref,
             account_id,
             transaction_type_id,
@@ -1308,7 +1308,7 @@ class Customer extends Database{
         ");
         $this->db->bind(':transaction_ref', $transaction_ref);
         $this->db->bind(':sender', $sender);
-        $this->db->bind(':transaction_type', 8);
+        $this->db->bind(':transaction_type', 9); // Transfer Out
         $this->db->bind(':amount', $amount);
         $this->db->bind(':balance_after', $senderBalanceAfter);
         $this->db->bind(':message', $message);
@@ -1318,7 +1318,7 @@ class Customer extends Database{
         if ($fee > 0) {
             $senderBalanceAfter = $senderBalanceAfter - $fee; // Subtract fee
             $this->db->query("
-            INSERT INTO Transaction (
+            INSERT INTO bank_transactions (
                 account_id,
                 transaction_type_id,
                 amount,
@@ -1348,7 +1348,7 @@ class Customer extends Database{
                 a.account_id, 
                 a.account_number
             FROM 
-                Accounts a
+                customer_accounts a
             WHERE 
                 a.customer_id = :id
             AND
@@ -1363,7 +1363,7 @@ class Customer extends Database{
 
     // transaction 
     public function getTransactionTypes() {
-        $this->db->query("SELECT type_name FROM Transaction_Type ORDER BY type_name");
+        $this->db->query("SELECT type_name FROM transaction_types ORDER BY type_name");
         return $this->db->resultSet();
     }
 
@@ -1373,8 +1373,8 @@ class Customer extends Database{
                 a.account_id,
                 a.account_number,
                 act.type_name AS account_type
-            FROM Accounts a
-            LEFT JOIN Account_Types act ON a.account_type_id = act.account_type_id
+            FROM customer_accounts a
+            LEFT JOIN bank_account_types act ON a.account_type_id = act.account_type_id
             WHERE
                 a.customer_id = :customer_id AND a.is_active = 1
             ORDER BY a.account_number
@@ -1410,9 +1410,9 @@ class Customer extends Database{
                 a.account_id,
                 ({$sql_signed_amount}) AS signed_amount,
                 t.amount AS raw_amount
-            FROM Accounts a
-            INNER JOIN Transaction t ON a.account_id = t.account_id
-            LEFT JOIN Transaction_Type tt ON t.transaction_type_id = tt.transaction_type_id
+            FROM customer_accounts a
+            INNER JOIN bank_transactions t ON a.account_id = t.account_id
+            LEFT JOIN transaction_types tt ON t.transaction_type_id = tt.transaction_type_id
             WHERE
                 a.customer_id = :customer_id
                 AND a.is_active = 1
@@ -1501,9 +1501,9 @@ class Customer extends Database{
                     a.account_number, 
                     ({$sql_signed_amount}) AS signed_amount,
                     t.amount AS raw_amount
-                FROM Transaction t
-                JOIN Transaction_Type tt ON t.transaction_type_id = tt.transaction_type_id
-                JOIN Accounts a ON t.account_id = a.account_id
+                FROM bank_transactions t
+                JOIN transaction_types tt ON t.transaction_type_id = tt.transaction_type_id
+                JOIN customer_accounts a ON t.account_id = a.account_id
                 WHERE a.customer_id = :customer_id AND a.is_active = 1";
 
         $params = [':customer_id' => $customer_id];
@@ -1554,7 +1554,7 @@ class Customer extends Database{
             FROM
                 loan_applications la
             INNER JOIN
-                Accounts a ON la.account_number = a.account_number
+                customer_accounts a ON la.account_number = a.account_number
             WHERE
                 a.customer_id = :customer_id
                 AND la.status = 'Active'
@@ -1579,7 +1579,7 @@ class Customer extends Database{
         $this->db->query("
             SELECT la.id, la.loan_amount, la.status
             FROM loan_applications la
-            INNER JOIN Accounts a ON la.account_number = a.account_number
+            INNER JOIN customer_accounts a ON la.account_number = a.account_number
             WHERE la.id = :application_id AND a.customer_id = :customer_id AND la.status = 'Active'
         ");
         $this->db->bind(':application_id', $applicationId);
@@ -1601,7 +1601,7 @@ class Customer extends Database{
         // 2. Validate that the source account belongs to the customer and is not locked
         $this->db->query("
             SELECT account_id
-            FROM Accounts
+            FROM customer_accounts
             WHERE account_number = :account_number AND customer_id = :customer_id AND is_active = 1 AND (is_locked = 0 OR is_locked IS NULL)
         ");
         $this->db->bind(':account_number', $sourceAccountNumber);
@@ -1638,7 +1638,7 @@ class Customer extends Database{
             }
 
             // 6. Insert bank transaction for the payment (debit from source account)
-            $transactionTypeId = 7; // Assuming 7 is 'Loan Payment'
+            $transactionTypeId = 6; // Loan Payment
             $transactionRef = uniqid('LP-'); // Prefix for clarity
             $description = "Loan Payment - Ref: {$transactionRef}, Application ID: {$applicationId}, From: {$sourceAccountNumber}";
 
@@ -1647,7 +1647,7 @@ class Customer extends Database{
             $balance_after = $currentBalance - $paymentAmount; // Loan payment reduces balance
 
             $this->db->query("
-                INSERT INTO Transaction (
+                INSERT INTO bank_transactions (
                     transaction_ref,
                     account_id,
                     transaction_type_id,
@@ -1708,7 +1708,7 @@ class Customer extends Database{
 
     public function getPrimaryAccountNumber($customerId)
     {
-        $this->db->query("SELECT account_number FROM Accounts WHERE customer_id = :customer_id AND is_active = 1 LIMIT 1");
+        $this->db->query("SELECT account_number FROM customer_accounts WHERE customer_id = :customer_id AND is_active = 1 LIMIT 1");
         $this->db->bind(':customer_id', $customerId);
         $result = $this->db->single();
         return $result ? $result->account_number : null;
@@ -1723,7 +1723,7 @@ class Customer extends Database{
     {
         $this->db->query("
             SELECT referral_code, total_points 
-            FROM Customers 
+            FROM bank_customers 
             WHERE customer_id = :customer_id
         ");
         $this->db->bind(':customer_id', $customerId);
@@ -1739,7 +1739,7 @@ class Customer extends Database{
         // Get total points
         $this->db->query("
             SELECT total_points 
-            FROM Customers 
+            FROM bank_customers 
             WHERE customer_id = :customer_id
         ");
         $this->db->bind(':customer_id', $customerId);
@@ -1749,7 +1749,7 @@ class Customer extends Database{
         // Count number of referrals (people who used this customer's code)
         $this->db->query("
             SELECT COUNT(*) as referral_count
-            FROM Customers
+            FROM bank_customers
             WHERE referred_by_customer_id = :customer_id
         ");
         $this->db->bind(':customer_id', $customerId);
@@ -1779,7 +1779,7 @@ class Customer extends Database{
             // Check if user already used a referral code
             $this->db->query("
                 SELECT referred_by_customer_id 
-                FROM Customers 
+                FROM bank_customers 
                 WHERE customer_id = :customer_id AND referred_by_customer_id IS NOT NULL
             ");
             $this->db->bind(':customer_id', $customerId);
@@ -1793,7 +1793,7 @@ class Customer extends Database{
             // Get user's own referral code to prevent self-referral
             $this->db->query("
                 SELECT referral_code 
-                FROM Customers 
+                FROM bank_customers 
                 WHERE customer_id = :customer_id
             ");
             $this->db->bind(':customer_id', $customerId);
@@ -1807,7 +1807,7 @@ class Customer extends Database{
             // Find the referrer
             $this->db->query("
                 SELECT customer_id, first_name, last_name 
-                FROM Customers 
+                FROM bank_customers 
                 WHERE referral_code = :referral_code
             ");
             $this->db->bind(':referral_code', $friendCode);
@@ -1832,7 +1832,7 @@ class Customer extends Database{
 
             // Update new customer with referrer info
             $this->db->query("
-                UPDATE Customers 
+                UPDATE bank_customers 
                 SET referred_by_customer_id = :referrer_id 
                 WHERE customer_id = :customer_id
             ");
@@ -1842,7 +1842,7 @@ class Customer extends Database{
 
             // Award points to referrer
             $this->db->query("
-                UPDATE Customers 
+                UPDATE bank_customers 
                 SET total_points = total_points + :points 
                 WHERE customer_id = :referrer_id
             ");
@@ -1852,7 +1852,7 @@ class Customer extends Database{
 
             // Award points to new customer
             $this->db->query("
-                UPDATE Customers 
+                UPDATE bank_customers 
                 SET total_points = total_points + :points 
                 WHERE customer_id = :customer_id
             ");
@@ -1883,7 +1883,7 @@ class Customer extends Database{
      */
     public function calculateAndApplyInterest() {
         // Get transaction type ID for Interest Payment
-        $this->db->query("SELECT transaction_type_id FROM Transaction_Type WHERE type_name = 'Interest Payment' LIMIT 1");
+        $this->db->query("SELECT transaction_type_id FROM transaction_types WHERE type_name = 'Interest Payment' LIMIT 1");
         $interestType = $this->db->single();
         
         if (!$interestType) {
@@ -1903,8 +1903,8 @@ class Customer extends Database{
                 a.interest_rate,
                 a.last_interest_date,
                 a.customer_id
-            FROM Accounts a
-            INNER JOIN Account_Types at ON a.account_type_id = at.account_type_id
+            FROM customer_accounts a
+            INNER JOIN bank_account_types at ON a.account_type_id = at.account_type_id
             WHERE a.account_type_id = 1 
             AND a.interest_rate IS NOT NULL 
             AND a.interest_rate > 0
@@ -1938,7 +1938,7 @@ class Customer extends Database{
                 $balance_after = $balance + $interest_amount;
                 
                 $this->db->query("
-                    INSERT INTO Transaction 
+                    INSERT INTO bank_transactions 
                         (transaction_ref, account_id, transaction_type_id, amount, balance_after, description, created_at)
                     VALUES 
                         (:transaction_ref, :account_id, :transaction_type_id, :amount, :balance_after, :description, NOW())
@@ -1954,7 +1954,7 @@ class Customer extends Database{
                 if ($this->db->execute()) {
                     // Update last_interest_date
                     $this->db->query("
-                        UPDATE Accounts 
+                        UPDATE customer_accounts 
                         SET last_interest_date = CURDATE()
                         WHERE account_id = :account_id
                     ");
@@ -2002,8 +2002,8 @@ class Customer extends Database{
                         ELSE 0
                     END
                 ), 0) AS current_balance
-            FROM Transaction t
-            INNER JOIN Transaction_Type tt ON t.transaction_type_id = tt.transaction_type_id
+            FROM bank_transactions t
+            INNER JOIN transaction_types tt ON t.transaction_type_id = tt.transaction_type_id
             WHERE t.account_id = :account_id
         ");
         
@@ -2175,15 +2175,15 @@ class Customer extends Database{
                 idt.type_name as id_type,
                 ci.id_number
             FROM Account_Applications aa
-            INNER JOIN Customers c ON aa.customer_id = c.customer_id
+            INNER JOIN bank_customers c ON aa.customer_id = c.customer_id
             LEFT JOIN Emails e ON c.customer_id = e.customer_id AND e.is_primary = 1
             LEFT JOIN Phones p ON c.customer_id = p.customer_id AND p.is_primary = 1
-            LEFT JOIN Account_Types at ON aa.account_type_id = at.account_type_id
+            LEFT JOIN bank_account_types at ON aa.account_type_id = at.account_type_id
             LEFT JOIN Customer_Profile cp ON c.customer_id = cp.customer_id
             LEFT JOIN Addresses a ON c.customer_id = a.customer_id AND a.is_primary = 1
-            LEFT JOIN Barangay b ON a.barangay_id = b.barangay_id
-            LEFT JOIN City ct ON a.city_id = ct.city_id
-            LEFT JOIN Province pr ON a.province_id = pr.province_id
+            LEFT JOIN barangays b ON a.barangay_id = b.barangay_id
+            LEFT JOIN cities ct ON a.city_id = ct.city_id
+            LEFT JOIN provinces pr ON a.province_id = pr.province_id
             LEFT JOIN Customer_IDs ci ON c.customer_id = ci.customer_id
             LEFT JOIN ID_Types idt ON ci.id_type_id = idt.id_type_id
             WHERE e.email = :email AND e.is_active = 1
@@ -2212,7 +2212,7 @@ class Customer extends Database{
                 currency,
                 minimum_balance,
                 monthly_fee
-            FROM Account_Types 
+            FROM bank_account_types 
             WHERE is_active = 1
             ORDER BY type_name ASC
         ");
@@ -2229,7 +2229,7 @@ class Customer extends Database{
             // Validate account type exists and get minimum balance
             $this->db->query("
                 SELECT minimum_balance, type_name 
-                FROM Account_Types 
+                FROM bank_account_types 
                 WHERE account_type_id = :account_type_id AND is_active = 1
             ");
             $this->db->bind(':account_type_id', $data['account_type_id']);
@@ -2337,7 +2337,7 @@ class Customer extends Database{
 
             // 1. Create Customer record
             $this->db->query("
-                INSERT INTO Customers (first_name, middle_name, last_name, password_hash, is_active, created_at)
+                INSERT INTO bank_customers (first_name, middle_name, last_name, password_hash, is_active, created_at)
                 VALUES (:first_name, :middle_name, :last_name, :password_hash, 1, NOW())
             ");
             $this->db->bind(':first_name', $data['first_name']);
