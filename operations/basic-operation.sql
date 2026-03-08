@@ -77,9 +77,7 @@ CREATE TABLE `account_types` (
 
 INSERT INTO `account_types` (`account_type_id`, `type_name`, `description`, `allows_passbook`, `allows_atm_card`, `requires_parent_guardian`, `minimum_age`, `base_interest_rate`, `currency`, `minimum_balance`, `monthly_fee`, `is_active`, `created_at`) VALUES
 (1, 'Savings', 'Basic savings account', 1, 1, 0, NULL, 0.0250, 'PHP', 500.00, 30.00, 1, '2026-02-20 12:18:00'),
-(2, 'Junior Savings', 'Savings for minors', 1, 0, 1, 0, 0.0150, 'PHP', 0.00, 0.00, 1, '2026-02-20 12:18:00'),
-(3, 'Current', 'Current account for businesses', 0, 1, 0, NULL, 0.0000, 'PHP', 5000.00, 350.00, 1, '2026-02-20 12:18:00'),
-(4, 'Time Deposit', 'Fixed term deposit', 0, 0, 0, 18, 0.0500, 'PHP', 10000.00, 0.00, 1, '2026-02-20 12:18:00');
+(3, 'Current', 'Current account for businesses', 0, 1, 0, NULL, 0.0000, 'PHP', 5000.00, 350.00, 1, '2026-02-20 12:18:00');
 
 -- --------------------------------------------------------
 
@@ -458,10 +456,12 @@ INSERT INTO `transaction_type` (`transaction_type_id`, `type_name`, `description
 (1, 'Deposit', 'Money deposited into account'),
 (2, 'Withdrawal', 'Money withdrawn from account'),
 (3, 'Transfer', 'Money transferred between accounts'),
-(4, 'Interest', 'Interest credited to account'),
-(5, 'Fee', 'Service fee charged'),
+(4, 'Interest Payment', 'Interest credited to account'),
+(5, 'Service Charge', 'Service fee charged to account'),
 (6, 'Loan Payment', 'Payment towards loan'),
-(7, 'Loan Disbursement', 'Loan amount credited');
+(7, 'Loan Disbursement', 'Loan amount credited'),
+(8, 'Transfer Out', 'Money sent to another account'),
+(9, 'Transfer In', 'Money received from another account');
 
 -- --------------------------------------------------------
 
@@ -640,7 +640,7 @@ ALTER TABLE `account_history`
 -- AUTO_INCREMENT for table `account_types`
 --
 ALTER TABLE `account_types`
-  MODIFY `account_type_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+  MODIFY `account_type_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
 -- AUTO_INCREMENT for table `addresses`
@@ -730,7 +730,7 @@ ALTER TABLE `transaction`
 -- AUTO_INCREMENT for table `transaction_type`
 --
 ALTER TABLE `transaction_type`
-  MODIFY `transaction_type_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
+  MODIFY `transaction_type_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
 
 --
 -- Constraints for dumped tables

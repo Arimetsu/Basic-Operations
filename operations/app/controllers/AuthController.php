@@ -379,4 +379,36 @@ class AuthController extends Controller{
       exit;
     }
   }
+
+  public function activate() {
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
+    
+    // If already logged in, redirect to account
+    if(isset($_SESSION['customer_id'])){
+      header('Location: ' .URLROOT. '/customer/account');
+      exit;
+    }
+
+    // Load the activate view
+    $data = [];
+    $this->view('auth/activate', $data);
+  }
+
+  public function activateVerify() {
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
+    
+    // If already logged in, redirect to account
+    if(isset($_SESSION['customer_id'])){
+      header('Location: ' .URLROOT. '/customer/account');
+      exit;
+    }
+
+    // Load the activate verify view
+    $data = [];
+    $this->view('auth/activate_verify', $data);
+  }
 }
