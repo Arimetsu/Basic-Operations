@@ -1119,29 +1119,90 @@ class Customer extends Database{
     }
 
     public function validateRecipient($recipient_number, $recipient_name){
+        $debugLogFile = ROOT_PATH . '/app/logs/fund_transfer_debug.log';
+        $debugLog = function ($stage, $payload = []) use ($debugLogFile) {
+            $entry = [
+                'time' => date('Y-m-d H:i:s'),
+                'stage' => 'model.' . $stage,
+                'payload' => $payload
+            ];
+            error_log(json_encode($entry, JSON_UNESCAPED_SLASHES) . PHP_EOL, 3, $debugLogFile);
+        };
+
         $this->db->query("
             SELECT 
                 a.account_number, 
-                CONCAT_WS(' ', c.first_name, c.last_name) AS customer_name,
+                c.first_name,
+                c.middle_name,
+                c.last_name,
                 c.customer_id
             FROM 
-                Accounts a
+                customer_accounts a
             INNER JOIN 
-                Customers c ON a.customer_id = c.customer_id
+                bank_customers c ON a.customer_id = c.customer_id
             WHERE 
-                a.account_number = :recipient_number
-                AND a.is_active = 1;
+                TRIM(a.account_number) = TRIM(:recipient_number);
         ");
         $this->db->bind(':recipient_number', $recipient_number);
         $result = $this->db->single();
 
+        $debugLog('validateRecipient.query_result', [
+            'recipient_number' => $recipient_number,
+            'recipient_name' => $recipient_name,
+            'db_result' => $result
+        ]);
+
         if(empty($result)){
+            $debugLog('validateRecipient.failed', ['reason' => 'account_not_found']);
             return ['status' => false , 'error' => 'Invalid Account Number'];
         }
 
-        if (strtolower(trim($result->customer_name)) !== strtolower(trim($recipient_name))) {
+        $normalizeName = function ($name) {
+            // Remove punctuation and normalize spaces to support names like "D. Cruz" vs "D Cruz".
+            $clean = preg_replace('/[^a-z0-9\s]/i', ' ', (string) $name);
+            return preg_replace('/\s+/', ' ', strtolower(trim($clean)));
+        };
+
+        $toTokens = function ($name) use ($normalizeName) {
+            $normalized = $normalizeName($name);
+            return $normalized === '' ? [] : explode(' ', $normalized);
+        };
+
+        $enteredName = $normalizeName($recipient_name);
+        $fullNameWithMiddle = $normalizeName(trim($result->first_name . ' ' . $result->middle_name . ' ' . $result->last_name));
+        $fullNameNoMiddle = $normalizeName(trim($result->first_name . ' ' . $result->last_name));
+
+        $storedFirst = $normalizeName($result->first_name);
+        $storedLastTokens = $toTokens($result->last_name);
+        $storedLastCore = !empty($storedLastTokens) ? end($storedLastTokens) : '';
+        $enteredTokens = $toTokens($recipient_name);
+        $enteredHasFirst = in_array($storedFirst, $enteredTokens, true);
+        $enteredHasLastCore = $storedLastCore !== '' && in_array($storedLastCore, $enteredTokens, true);
+
+        $debugLog('validateRecipient.name_compare', [
+            'entered_name' => $enteredName,
+            'full_name_with_middle' => $fullNameWithMiddle,
+            'full_name_no_middle' => $fullNameNoMiddle,
+            'stored_first' => $storedFirst,
+            'stored_last_core' => $storedLastCore,
+            'entered_tokens' => $enteredTokens,
+            'entered_has_first' => $enteredHasFirst,
+            'entered_has_last_core' => $enteredHasLastCore
+        ]);
+
+        if (
+            $enteredName !== $fullNameWithMiddle &&
+            $enteredName !== $fullNameNoMiddle &&
+            !($enteredHasFirst && $enteredHasLastCore)
+        ) {
+            $debugLog('validateRecipient.failed', ['reason' => 'name_mismatch']);
             return ['status' => false, 'error' => 'Recipient name does not match the account number.'];
         }
+
+        $debugLog('validateRecipient.success', [
+            'customer_id' => $result->customer_id,
+            'account_number' => $result->account_number
+        ]);
 
         return [
             'status' => true,

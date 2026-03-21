@@ -238,6 +238,7 @@ body {
                                 <li id="uppercase" class="mb-2 text-danger"><i class="fas fa-times me-2"></i> Contains at least one uppercase character</li>
                                 <li id="lowercase" class="mb-2 text-danger"><i class="fas fa-times me-2"></i> Contains at least one lowercase character</li>
                                 <li id="number" class="mb-2 text-danger"><i class="fas fa-times me-2"></i> Contains at least one number</li>
+                                <li id="special" class="mb-2 text-danger"><i class="fas fa-times me-2"></i> Contains at least one special character</li>
                                 <li id="match" class="mb-2 text-danger"><i class="fas fa-times me-2"></i> Type the password again to confirm</li>
                             </ul>
                         </div>
@@ -260,6 +261,7 @@ body {
         uppercase: document.getElementById('uppercase'),
         lowercase: document.getElementById('lowercase'),
         number: document.getElementById('number'),
+        special: document.getElementById('special'),
         match: document.getElementById('match')
     };
 
@@ -290,6 +292,9 @@ body {
         // Number
         updateRequirement(requirements.number, /\d/.test(pwd), 'Contains at least one number', 'Contains at least one number');
 
+        // Special character
+        updateRequirement(requirements.special, /[!@#$%^&*()_+\-=\[\]{};:'",.<>\/?]/.test(pwd), 'Contains at least one special character', 'Contains at least one special character');
+
         // Match with confirm password - IMPROVED LOGIC
         if (pwd !== "" && pwd === confirmPwd) {
             updateRequirement(requirements.match, true, 'Passwords match', 'Type the password again to confirm');
@@ -305,6 +310,42 @@ body {
 
     newPassword.addEventListener('input', checkPasswordRequirements);
     confirmPassword.addEventListener('input', checkPasswordRequirements);
+
+    // Client-side enforcement aligned with signup rules.
+    document.getElementById('changePasswordForm').addEventListener('submit', function(e) {
+        const pwd = newPassword.value;
+        const confirmPwd = confirmPassword.value;
+
+        if (pwd.length < 10) {
+            e.preventDefault();
+            alert('Password must be at least 10 characters long!');
+            return;
+        }
+        if (!/[A-Z]/.test(pwd)) {
+            e.preventDefault();
+            alert('Password must contain at least one uppercase letter!');
+            return;
+        }
+        if (!/[a-z]/.test(pwd)) {
+            e.preventDefault();
+            alert('Password must contain at least one lowercase letter!');
+            return;
+        }
+        if (!/\d/.test(pwd)) {
+            e.preventDefault();
+            alert('Password must contain at least one number!');
+            return;
+        }
+        if (!/[!@#$%^&*()_+\-=\[\]{};:'",.<>\/?]/.test(pwd)) {
+            e.preventDefault();
+            alert('Password must contain at least one special character (!@#$%^&* etc.)!');
+            return;
+        }
+        if (pwd !== confirmPwd) {
+            e.preventDefault();
+            alert('Passwords do not match!');
+        }
+    });
 
     // Toggle visibility function
     function togglePassword(id, icon) {

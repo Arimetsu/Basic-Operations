@@ -110,7 +110,15 @@ class CustomerController extends Controller {
             if(empty($data['new_password'])){
                 $data['new_password_err'] = 'Please enter a new password.';
             } elseif(strlen($data['new_password']) < 10){
-                $data['new_password_err'] = 'Password must be at least 10 characters long.'; 
+                $data['new_password_err'] = 'Password must be at least 10 characters long.';
+            } elseif(!preg_match('/[A-Z]/', $data['new_password'])) {
+                $data['new_password_err'] = 'Password must contain at least one uppercase letter.';
+            } elseif(!preg_match('/[a-z]/', $data['new_password'])) {
+                $data['new_password_err'] = 'Password must contain at least one lowercase letter.';
+            } elseif(!preg_match('/[0-9]/', $data['new_password'])) {
+                $data['new_password_err'] = 'Password must contain at least one number.';
+            } elseif(!preg_match('/[!@#$%^&*()_+\-=\[\]{};:\'",.<>\/?]/', $data['new_password'])) {
+                $data['new_password_err'] = 'Password must contain at least one special character.';
             }
 
             if(empty($data['confirm_password'])){
@@ -580,6 +588,24 @@ class CustomerController extends Controller {
     public function fund_transfer(){
 
         if ($_SERVER['REQUEST_METHOD'] === 'POST'){
+            $debugLogFile = ROOT_PATH . '/app/logs/fund_transfer_debug.log';
+            $debugLog = function ($stage, $payload = []) use ($debugLogFile) {
+                $entry = [
+                    'time' => date('Y-m-d H:i:s'),
+                    'stage' => $stage,
+                    'payload' => $payload
+                ];
+                error_log(json_encode($entry, JSON_UNESCAPED_SLASHES) . PHP_EOL, 3, $debugLogFile);
+            };
+            
+            $debugLog('fund_transfer_request', [
+                'customer_id' => $_SESSION['customer_id'] ?? null,
+                'transfer_type' => $_POST['transfer_type'] ?? null,
+                'from_account' => $_POST['from_account'] ?? null,
+                'recipient_number' => $_POST['recipient_number'] ?? null,
+                'recipient_name' => $_POST['recipient_name'] ?? null,
+                'amount' => $_POST['amount'] ?? null
+            ]);
             
             $transfer_type = trim($_POST['transfer_type'] ?? 'another_account');
             $from_account = trim($_POST['from_account']);
@@ -709,6 +735,11 @@ class CustomerController extends Controller {
                 }
 
                 $recipient_validation = $this->customerModel->validateRecipient($data['recipient_number'], $data['recipient_name']);
+                $debugLog('recipient_validation_result', [
+                    'input_recipient_number' => $data['recipient_number'],
+                    'input_recipient_name' => $data['recipient_name'],
+                    'result' => $recipient_validation
+                ]);
 
                 if(!$recipient_validation['status']){
                     $data = array_merge($data, [
@@ -747,6 +778,18 @@ class CustomerController extends Controller {
                 $data['amount_error'] = 'Insufficient Funds';
             }
 
+            $debugLog('fund_transfer_computed', [
+                'fee' => $fee,
+                'total' => $total,
+                'available_balance' => $amount_validation->balance ?? null,
+                'from_account_error' => $data['from_account_error'],
+                'to_account_error' => $data['to_account_error'],
+                'recipient_number_error' => $data['recipient_number_error'],
+                'recipient_name_error' => $data['recipient_name_error'],
+                'amount_error' => $data['amount_error'],
+                'other_error' => $data['other_error']
+            ]);
+
             // Check maintaining balance rule and require confirmation flag if this transfer will leave balance below minimum
             $senderAccount = $this->customerModel->getAccountByNumber($data['from_account']);
             $maintaining_required = isset($senderAccount->maintaining_balance_required) ? (float)$senderAccount->maintaining_balance_required : 500.00;
@@ -764,6 +807,12 @@ class CustomerController extends Controller {
             }
 
             if(empty($data['from_account_error']) && empty($data['to_account_error']) && empty($data['recipient_number_error']) && empty($data['recipient_name_error']) && empty($data['amount_error']) && empty($data['message_error']) && empty($data['other_error']) && empty($data['bank_name_error']) && empty($data['bank_account_number_error']) && empty($data['bank_account_name_error'])){
+                $debugLog('fund_transfer_passed_validation', [
+                    'transfer_type' => $transfer_type,
+                    'from_account' => $data['from_account'],
+                    'recipient_number' => $data['recipient_number'],
+                    'amount' => $data['amount']
+                ]);
                 $temp_transaction_ref = 'TXN-PREVIEW-' . date('YmdHis') . '-' . strtoupper(bin2hex(random_bytes(3)));
                 $remaining_balance = (float)$amount_validation->balance - $total;
                 $sender_name = $_SESSION['customer_first_name'] . ' ' . $_SESSION['customer_last_name'] ?? 'Sender Name Unknown';
@@ -791,6 +840,20 @@ class CustomerController extends Controller {
                     $this->view('customer/receipt', $data);
                 }
             } else {
+                $debugLog('fund_transfer_failed_validation', [
+                    'errors' => [
+                        'from_account_error' => $data['from_account_error'],
+                        'to_account_error' => $data['to_account_error'],
+                        'recipient_number_error' => $data['recipient_number_error'],
+                        'recipient_name_error' => $data['recipient_name_error'],
+                        'amount_error' => $data['amount_error'],
+                        'message_error' => $data['message_error'],
+                        'other_error' => $data['other_error'],
+                        'bank_name_error' => $data['bank_name_error'],
+                        'bank_account_number_error' => $data['bank_account_number_error'],
+                        'bank_account_name_error' => $data['bank_account_name_error']
+                    ]
+                ]);
                 $accounts = $this->customerModel->getAccountsByCustomerId($_SESSION['customer_id']);
                 $data = array_merge($data, [
                     'title' => 'Fund Transfer',

@@ -36,8 +36,16 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['set_password'])) {
     // Validation
     if (empty($password) || empty($confirm_password)) {
         $error = "Please fill in all fields.";
-    } elseif (strlen($password) < 8) {
-        $error = "Password must be at least 8 characters long.";
+    } elseif (strlen($password) < 10) {
+        $error = "Password must be at least 10 characters long.";
+    } elseif (!preg_match('/[A-Z]/', $password)) {
+        $error = "Password must contain at least one uppercase letter.";
+    } elseif (!preg_match('/[a-z]/', $password)) {
+        $error = "Password must contain at least one lowercase letter.";
+    } elseif (!preg_match('/[0-9]/', $password)) {
+        $error = "Password must contain at least one number.";
+    } elseif (!preg_match('/[!@#$%^&*()_+\-=\[\]{};:\'",.<>\/?]/', $password)) {
+        $error = "Password must contain at least one special character.";
     } elseif ($password !== $confirm_password) {
         $error = "Passwords do not match.";
     } else {
@@ -258,7 +266,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['set_password'])) {
                                    id="password" 
                                    name="password" 
                                    placeholder="Enter your password"
-                                   minlength="8"
+                                minlength="10"
                                    required>
                             <button class="btn btn-outline-secondary" type="button" id="togglePassword">
                                 <i class="bi bi-eye-fill"></i>
@@ -267,7 +275,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['set_password'])) {
                         <div class="password-strength">
                             <div class="password-strength-bar" id="strengthBar"></div>
                         </div>
-                        <small class="form-text text-muted" id="strengthText">Minimum 8 characters</small>
+                        <small class="form-text text-muted" id="strengthText">Minimum 10 characters</small>
                     </div>
                     
                     <div class="mb-3">
@@ -280,7 +288,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['set_password'])) {
                                    id="confirm_password" 
                                    name="confirm_password" 
                                    placeholder="Re-enter your password"
-                                   minlength="8"
+                                minlength="10"
                                    required>
                             <button class="btn btn-outline-secondary" type="button" id="toggleConfirmPassword">
                                 <i class="bi bi-eye-fill"></i>
@@ -291,7 +299,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['set_password'])) {
                     
                     <div class="alert alert-info py-2" style="font-size: 13px;">
                         <i class="bi bi-info-circle-fill me-2"></i>
-                        <strong>Requirements:</strong> At least 8 characters, mix of letters and numbers recommended
+                        <strong>Requirements:</strong> At least 10 characters with uppercase, lowercase, number, and special character
                     </div>
                     
                     <div class="d-grid">
@@ -344,17 +352,18 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['set_password'])) {
             const strengthText = document.getElementById('strengthText');
             
             let strength = 0;
-            if (password.length >= 8) strength++;
-            if (password.match(/[a-z]/) && password.match(/[A-Z]/)) strength++;
+            if (password.length >= 10) strength++;
+            if (password.match(/[A-Z]/)) strength++;
+            if (password.match(/[a-z]/)) strength++;
             if (password.match(/[0-9]/)) strength++;
-            if (password.match(/[^a-zA-Z0-9]/)) strength++;
+            if (password.match(/[!@#$%^&*()_+\-=\[\]{};:'",.<>\/?]/)) strength++;
             
             strengthBar.className = 'password-strength-bar';
-            if (strength === 0 || password.length < 8) {
+            if (strength === 0 || password.length < 10) {
                 strengthBar.classList.add('strength-weak');
                 strengthText.textContent = 'Weak password';
                 strengthText.style.color = '#dc3545';
-            } else if (strength <= 2) {
+            } else if (strength <= 3) {
                 strengthBar.classList.add('strength-medium');
                 strengthText.textContent = 'Medium strength';
                 strengthText.style.color = '#ffc107';
@@ -379,6 +388,42 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['set_password'])) {
             } else {
                 matchText.textContent = '✗ Passwords do not match';
                 matchText.style.color = '#dc3545';
+            }
+        });
+
+        // Enforce same submit-time requirements as signup page.
+        document.querySelector('form').addEventListener('submit', function(e) {
+            const password = document.getElementById('password').value;
+            const confirmPassword = document.getElementById('confirm_password').value;
+
+            if (password.length < 10) {
+                e.preventDefault();
+                alert('Password must be at least 10 characters long!');
+                return;
+            }
+            if (!/[A-Z]/.test(password)) {
+                e.preventDefault();
+                alert('Password must contain at least one uppercase letter!');
+                return;
+            }
+            if (!/[a-z]/.test(password)) {
+                e.preventDefault();
+                alert('Password must contain at least one lowercase letter!');
+                return;
+            }
+            if (!/\d/.test(password)) {
+                e.preventDefault();
+                alert('Password must contain at least one number!');
+                return;
+            }
+            if (!/[!@#$%^&*()_+\-=\[\]{};:'",.<>\/?]/.test(password)) {
+                e.preventDefault();
+                alert('Password must contain at least one special character (!@#$%^&* etc.)!');
+                return;
+            }
+            if (password !== confirmPassword) {
+                e.preventDefault();
+                alert('Passwords do not match!');
             }
         });
     </script>

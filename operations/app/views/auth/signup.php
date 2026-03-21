@@ -396,7 +396,9 @@
                 <div class="row">
                     <div class="col-md-6 mb-3">
                         <label class="form-label">Date of Birth *</label>
-                        <input type="date" name="date_of_birth" class="form-control" required 
+                        <input type="date" name="date_of_birth" id="date_of_birth" class="form-control" required 
+                               min="<?= date('Y-m-d', strtotime('-120 years')) ?>"
+                               max="<?= date('Y-m-d', strtotime('-18 years')) ?>"
                                value="<?= htmlspecialchars($data['date_of_birth'] ?? '') ?>">
                     </div>
                 </div>
@@ -567,12 +569,14 @@
                 <div class="row">
                     <div class="col-md-6 mb-3">
                         <label class="form-label">Issue Date</label>
-                        <input type="date" name="id_issue_date" class="form-control" 
+                           <input type="date" name="id_issue_date" id="id_issue_date" class="form-control" 
+                               max="<?= date('Y-m-d') ?>"
                                value="<?= htmlspecialchars($data['id_issue_date'] ?? '') ?>">
                     </div>
                     <div class="col-md-6 mb-3">
                         <label class="form-label">Expiration Date</label>
-                        <input type="date" name="id_expiration_date" class="form-control" 
+                           <input type="date" name="id_expiration_date" id="id_expiration_date" class="form-control" 
+                               min="<?= date('Y-m-d') ?>"
                                value="<?= htmlspecialchars($data['id_expiration_date'] ?? '') ?>">
                     </div>
                 </div>
@@ -1036,6 +1040,68 @@ function selectAccountType(type, element) {
     document.getElementById(targetId).checked = true;
 }
 
+function validateDateRules() {
+    const dobInput = document.getElementById('date_of_birth');
+    const issueInput = document.getElementById('id_issue_date');
+    const expirationInput = document.getElementById('id_expiration_date');
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (dobInput && dobInput.value) {
+        const dob = new Date(dobInput.value + 'T00:00:00');
+        const minDob = new Date(today);
+        minDob.setFullYear(today.getFullYear() - 120);
+        const maxDob = new Date(today);
+        maxDob.setFullYear(today.getFullYear() - 18);
+
+        if (dob > today) {
+            alert('Date of birth cannot be in the future.');
+            dobInput.focus();
+            return false;
+        }
+        if (dob < minDob) {
+            alert('Date of birth is too far in the past.');
+            dobInput.focus();
+            return false;
+        }
+        if (dob > maxDob) {
+            alert('You must be at least 18 years old to register.');
+            dobInput.focus();
+            return false;
+        }
+    }
+
+    let issueDate = null;
+    let expirationDate = null;
+
+    if (issueInput && issueInput.value) {
+        issueDate = new Date(issueInput.value + 'T00:00:00');
+        if (issueDate > today) {
+            alert('ID issue date cannot be in the future.');
+            issueInput.focus();
+            return false;
+        }
+    }
+
+    if (expirationInput && expirationInput.value) {
+        expirationDate = new Date(expirationInput.value + 'T00:00:00');
+        if (expirationDate < today) {
+            alert('ID expiration date cannot be in the past.');
+            expirationInput.focus();
+            return false;
+        }
+    }
+
+    if (issueDate && expirationDate && issueDate > expirationDate) {
+        alert('ID issue date must be on or before the ID expiration date.');
+        issueInput.focus();
+        return false;
+    }
+
+    return true;
+}
+
 function changeStep(direction) {
     const currentStepContent = document.querySelector(`.step-content[data-step="${currentStep}"]`);
     
@@ -1061,6 +1127,10 @@ function changeStep(direction) {
         
         if (!valid) {
             alert('Please fill all required fields before proceeding.');
+            return;
+        }
+
+        if (!validateDateRules()) {
             return;
         }
     }
@@ -1269,6 +1339,11 @@ document.getElementById('cameraModal').addEventListener('hidden.bs.modal', funct
 
 // Form validation on submit
 document.getElementById('signupForm').addEventListener('submit', function(e) {
+    if (!validateDateRules()) {
+        e.preventDefault();
+        return false;
+    }
+
     const password = document.getElementById('password').value;
     const confirmPassword = document.getElementById('confirm_password').value;
     

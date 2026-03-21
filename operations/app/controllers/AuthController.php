@@ -213,6 +213,21 @@ class AuthController extends Controller{
       // Validation
       $errors = [];
 
+      $today = new DateTime('today');
+      $maxDob = (clone $today)->modify('-18 years');
+      $minDob = (clone $today)->modify('-120 years');
+
+      $parseDate = function ($dateStr) {
+        if (empty($dateStr)) {
+          return null;
+        }
+        $dt = DateTime::createFromFormat('Y-m-d', $dateStr);
+        if (!$dt || $dt->format('Y-m-d') !== $dateStr) {
+          return false;
+        }
+        return $dt;
+      };
+
       if(empty($data['first_name'])) {
         $errors[] = 'First name is required';
       }
@@ -233,6 +248,42 @@ class AuthController extends Controller{
         if(substr($phone, 0, 3) !== '+63') {
           $data['phone_number'] = '+63' . $phone;
         }
+      }
+
+      // Date validations (DOB and ID dates)
+      $dob = $parseDate($data['date_of_birth']);
+      if ($dob === false) {
+        $errors[] = 'Date of birth must be a valid date.';
+      } elseif ($dob === null) {
+        $errors[] = 'Date of birth is required.';
+      } else {
+        if ($dob > $today) {
+          $errors[] = 'Date of birth cannot be in the future.';
+        }
+        if ($dob < $minDob) {
+          $errors[] = 'Date of birth is too far in the past.';
+        }
+        if ($dob > $maxDob) {
+          $errors[] = 'You must be at least 18 years old to register.';
+        }
+      }
+
+      $idIssueDate = $parseDate($data['id_issue_date']);
+      if ($idIssueDate === false) {
+        $errors[] = 'ID issue date must be a valid date.';
+      } elseif ($idIssueDate !== null && $idIssueDate > $today) {
+        $errors[] = 'ID issue date cannot be in the future.';
+      }
+
+      $idExpirationDate = $parseDate($data['id_expiration_date']);
+      if ($idExpirationDate === false) {
+        $errors[] = 'ID expiration date must be a valid date.';
+      } elseif ($idExpirationDate !== null && $idExpirationDate < $today) {
+        $errors[] = 'ID expiration date cannot be in the past.';
+      }
+
+      if ($idIssueDate instanceof DateTime && $idExpirationDate instanceof DateTime && $idIssueDate > $idExpirationDate) {
+        $errors[] = 'ID issue date must be on or before the ID expiration date.';
       }
 
       // Enhanced password validation

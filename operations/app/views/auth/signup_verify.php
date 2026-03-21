@@ -103,55 +103,81 @@ if (isset($_SESSION['otp_signup_time'])) {
 
 <style>
     body {
-        background: linear-gradient(135deg, #f5f7fa 0%, #e9ecef 100%);
+        background: #f8f9fa;
         min-height: 100vh;
-        padding: 40px 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        padding: 20px;
     }
+    
     .verify-container {
-        max-width: 500px;
-        margin: 0 auto;
         background: white;
-        border-radius: 16px;
-        box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+        border-radius: 12px;
+        box-shadow: 0 2px 20px rgba(0, 0, 0, 0.08);
+        max-width: 450px;
+        width: 100%;
+        border: 1px solid #e9ecef;
         overflow: hidden;
     }
+    
     .verify-header {
-        background: linear-gradient(135deg, #003631 0%, #0a5a4f 50%, #146c43 100%);
-        padding: 40px 30px;
+        background: white;
+        border-bottom: 2px solid #003631;
+        padding: 30px 30px 20px;
         text-align: center;
-        color: white;
     }
+    
+    .icon-circle {
+        width: 60px;
+        height: 60px;
+        background: #e8f5f3;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 15px;
+    }
+    
     .verify-header h1 {
-        margin: 0 0 10px;
-        font-size: 28px;
+        color: #003631;
+        font-size: 24px;
         font-weight: 700;
+        margin: 0 0 8px;
     }
+    
     .verify-header p {
+        color: #6c757d;
+        font-size: 14px;
         margin: 0;
-        opacity: 0.9;
-        font-size: 15px;
     }
+    
     .verify-body {
-        padding: 40px 30px;
+        padding: 25px 30px 30px;
     }
+    
     .info-box {
         background: #e8f5f3;
         border-left: 4px solid #003631;
-        padding: 15px 20px;
-        margin-bottom: 25px;
+        padding: 12px 15px;
+        margin-bottom: 20px;
         border-radius: 4px;
-    }
-    .info-box p {
-        margin: 0;
+        font-size: 13px;
         color: #003631;
-        font-size: 14px;
     }
+    
+    .info-box i {
+        margin-right: 8px;
+    }
+    
     .otp-input-group {
         display: flex;
         gap: 10px;
         justify-content: center;
         margin: 30px 0;
     }
+    
     .otp-input {
         width: 50px;
         height: 60px;
@@ -161,75 +187,98 @@ if (isset($_SESSION['otp_signup_time'])) {
         border: 2px solid #dee2e6;
         border-radius: 8px;
         transition: all 0.2s;
+        font-family: 'Courier New', monospace;
     }
+    
     .otp-input:focus {
         border-color: #003631;
         box-shadow: 0 0 0 3px rgba(0, 54, 49, 0.1);
         outline: none;
     }
+    
     .btn-verify {
         background: #003631;
         color: white;
         border: none;
-        padding: 14px;
-        font-size: 16px;
+        padding: 11px;
+        font-size: 15px;
         font-weight: 600;
-        border-radius: 8px;
+        border-radius: 6px;
         width: 100%;
         transition: all 0.2s;
         cursor: pointer;
     }
+    
     .btn-verify:hover {
         background: #004d45;
         transform: translateY(-1px);
         box-shadow: 0 4px 12px rgba(0, 54, 49, 0.2);
     }
+    
     .btn-verify:disabled {
         background: #6c757d;
         cursor: not-allowed;
         opacity: 0.6;
+        transform: none;
     }
+    
     .timer {
         text-align: center;
         margin: 20px 0;
         font-size: 14px;
         color: #666;
     }
+    
     .timer .time {
         font-weight: 700;
         color: #003631;
         font-size: 18px;
     }
+    
+    .timer.expired .time {
+        color: #dc3545;
+    }
+    
     .resend-section {
         text-align: center;
         padding-top: 20px;
         border-top: 1px solid #e9ecef;
         margin-top: 30px;
     }
+    
+    .resend-section p {
+        font-size: 13px;
+        color: #666;
+        margin-bottom: 12px;
+    }
+    
     .btn-resend {
-        background: transparent;
-        color: #003631;
-        border: 2px solid #003631;
-        padding: 10px 24px;
+        background: #6c757d;
+        color: white;
+        border: none;
+        padding: 9px 20px;
         font-weight: 600;
-        border-radius: 8px;
+        border-radius: 6px;
         cursor: pointer;
         transition: all 0.2s;
+        font-size: 14px;
     }
-    .btn-resend:hover {
-        background: #003631;
-        color: white;
+    
+    .btn-resend:hover:not(:disabled) {
+        background: #5a6268;
+        transform: translateY(-1px);
     }
+    
     .btn-resend:disabled {
-        border-color: #dee2e6;
-        color: #6c757d;
+        opacity: 0.5;
         cursor: not-allowed;
     }
+    
     .success-message {
         background: #d1e7dd;
         color: #0f5132;
-        padding: 12px 20px;
-        border-radius: 8px;
+        padding: 12px 15px;
+        border-radius: 6px;
         margin-bottom: 20px;
         display: flex;
         align-items: center;
@@ -240,7 +289,9 @@ if (isset($_SESSION['otp_signup_time'])) {
 
 <div class="verify-container">
     <div class="verify-header">
-        <i class="bi bi-envelope-check" style="font-size: 48px; margin-bottom: 15px; display: block;"></i>
+        <div class="icon-circle">
+            <i class="bi bi-envelope-check" style="font-size: 28px; color: #003631;"></i>
+        </div>
         <h1>Verify Your Email</h1>
         <p>We sent a 6-digit code to <strong><?= htmlspecialchars($_SESSION['pending_signup_data']['email']); ?></strong></p>
     </div>
@@ -262,7 +313,7 @@ if (isset($_SESSION['otp_signup_time'])) {
         <?php endif; ?>
         
         <div class="info-box">
-            <p><i class="bi bi-info-circle me-2"></i>Enter the 6-digit code we sent to your email to complete your registration.</p>
+            <p><i class="bi bi-info-circle"></i>Enter the 6-digit code we sent to your email to complete your registration.</p>
         </div>
         
         <form method="POST" id="otpForm">
@@ -286,10 +337,14 @@ if (isset($_SESSION['otp_signup_time'])) {
             <div class="timer">
                 Code expires in <span class="time" id="timer"><?= gmdate("i:s", $remaining_time); ?></span>
             </div>
+        <?php else: ?>
+            <div class="timer expired">
+                Code has <span class="time">expired</span>
+            </div>
         <?php endif; ?>
         
         <div class="resend-section">
-            <p style="font-size: 14px; color: #666; margin-bottom: 12px;">Didn't receive the code?</p>
+            <p>Didn't receive the code?</p>
             <form method="POST" style="display: inline;">
                 <button type="submit" name="resend_otp" class="btn-resend" id="resendBtn" <?= !$otp_expired ? 'disabled' : ''; ?>>
                     <i class="bi bi-arrow-clockwise me-2"></i>Resend Code
@@ -356,6 +411,7 @@ if (isset($_SESSION['otp_signup_time'])) {
     // Timer countdown
     let remainingTime = <?= $remaining_time; ?>;
     const timerElement = document.getElementById('timer');
+    const timerContainer = timerElement?.parentElement;
     const resendBtn = document.getElementById('resendBtn');
     
     if (!<?= $otp_expired ? 'true' : 'false'; ?> && remainingTime > 0) {
@@ -365,7 +421,7 @@ if (isset($_SESSION['otp_signup_time'])) {
             if (remainingTime <= 0) {
                 clearInterval(countdown);
                 timerElement.textContent = 'Expired';
-                timerElement.style.color = '#dc3545';
+                timerContainer.classList.add('expired');
                 resendBtn.disabled = false;
             } else {
                 const minutes = Math.floor(remainingTime / 60);
