@@ -637,23 +637,23 @@ async function handleApprove() {
       console.log("Approval result:", result); // Debug log
       console.log("Account number:", result.account_number); // Debug log
 
-      // Set success message
-      document.getElementById("successMessage").textContent =
-        "Application approved successfully!";
-
       // Show account number if available
       const successDetailsDiv = document.getElementById("successDetails");
       const successAccountNumber = document.getElementById(
         "successAccountNumber"
       );
+      const successMessage = document.getElementById("successMessage");
 
       if (result.account_number) {
         successAccountNumber.textContent = result.account_number;
         successDetailsDiv.style.display = "block";
+        successMessage.textContent = 
+          "Application approved successfully! Your new account has been created.";
         console.log("Showing account number:", result.account_number); // Debug log
       } else {
         console.log("No account number in response"); // Debug log
         successDetailsDiv.style.display = "none";
+        successMessage.textContent = "Application approved successfully!";
       }
 
       // Show the modal

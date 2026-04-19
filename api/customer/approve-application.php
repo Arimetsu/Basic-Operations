@@ -182,15 +182,18 @@ try {
         $stmt->bindParam(':account_id', $accountId);
         $stmt->execute();
         
-        // 7. Update application status to approved
+        // 7. Update application status to approved with account number stored in rejection_reason
+        $accountNumberMessage = "Your account number is " . $accountNumber;
         $stmt = $db->prepare("
             UPDATE account_applications 
             SET application_status = 'Approved',
                 reviewed_at = NOW(),
-                reviewed_by_employee_id = :employee_id
+                reviewed_by_employee_id = :employee_id,
+                rejection_reason = :account_info
             WHERE application_id = :application_id
         ");
         $stmt->bindParam(':employee_id', $employeeId);
+        $stmt->bindParam(':account_info', $accountNumberMessage);
         $stmt->bindParam(':application_id', $applicationId);
         $stmt->execute();
         

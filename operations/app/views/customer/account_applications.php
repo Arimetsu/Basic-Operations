@@ -288,6 +288,14 @@ require_once ROOT_PATH . '/app/views/layouts/header.php';
                                         </div>
                                     <?php endif; ?>
                                     
+                                    <?php if (strtolower($app['application_status']) === 'approved' && !empty($app['rejection_reason'])): ?>
+                                        <div class="mt-3 p-3" style="background: #d1e7dd; border-radius: 8px; border-left: 4px solid #198754;">
+                                            <span class="info-label d-block mb-2" style="color: #0f5132;">
+                                                <i class="bi bi-check-circle me-1"></i><?= htmlspecialchars($app['rejection_reason']) ?>
+                                            </span>
+                                        </div>
+                                    <?php endif; ?>
+                                    
                                     <?php if (strtolower($app['application_status']) === 'rejected' && !empty($app['rejection_reason'])): ?>
                                         <div class="mt-3 p-3" style="background: #f8d7da; border-radius: 8px; border-left: 4px solid #dc3545;">
                                             <span class="info-label d-block mb-2" style="color: #842029;">

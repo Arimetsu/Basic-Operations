@@ -28,6 +28,12 @@ console.log("API Base URL:", API_BASE_URL);
 // Account types data cache
 let accountTypesData = {};
 
+// Uploaded image state mirrors the onboarding-security flow
+let uploadedFiles = {
+  id_front_image: null,
+  id_back_image: null,
+};
+
 // Initialize on page load
 document.addEventListener("DOMContentLoaded", function () {
   loadAccountTypes(); // Load account types first
@@ -126,17 +132,22 @@ function setupAccountTypeSelection() {
 }
 
 // Customer accounts cache
+      uploadedFiles.id_front_image = null;
+      uploadedFiles.id_back_image = null;
 let customerAccounts = [];
 
 // Account verification state
-let isAccountVerified = false;
+      const idFrontFile =
+        uploadedFiles.id_front_image ||
+        document.getElementById("id_front_image").files[0];
 let verifiedAccountInfo = null;
 
 // Setup form handlers
 function setupFormHandlers() {
   const form = document.getElementById("accountOpeningForm");
 
-  form.addEventListener("submit", handleFormSubmit);
+      const idBackFile =
+        uploadedFiles.id_back_image || document.getElementById("id_back_image").files[0];
 
   // Validate existing account number
   const existingAccountInput = document.getElementById(
@@ -169,8 +180,11 @@ function setupFormHandlers() {
     initialDepositInput.addEventListener("input", handleDepositAmountChange);
   }
 
-  // Handle deposit source selection
-  const depositSourceSelect = document.getElementById("deposit_source");
+        const idFrontFile =
+          uploadedFiles.id_front_image ||
+          document.getElementById("id_front_image").files[0];
+        const idBackFile =
+          uploadedFiles.id_back_image || document.getElementById("id_back_image").files[0];
   if (depositSourceSelect) {
     depositSourceSelect.addEventListener("change", handleDepositSourceChange);
   }
@@ -201,6 +215,7 @@ function setupFormHandlers() {
 function validateInitialDeposit(e) {
   const value = parseFloat(e.target.value);
 
+        const stateKey = inputId === "id_front_image" ? "id_front_image" : "id_back_image";
   if (value < 0) {
     showError("initial_deposit", "Initial deposit cannot be negative");
     return false;
@@ -211,6 +226,7 @@ function validateInitialDeposit(e) {
 }
 
 // Current step tracking
+          uploadedFiles[stateKey] = null;
 let currentStep = 1;
 
 // Handle form submission
@@ -219,6 +235,7 @@ async function handleFormSubmit(e) {
 
   // Clear previous errors and success message
   clearAllErrors();
+          uploadedFiles[stateKey] = null;
   hideSuccessMessage();
 
   if (currentStep === 1) {
@@ -318,6 +335,8 @@ async function submitAccountOpening() {
       document.getElementById("id_front_preview").classList.remove("show");
       document.getElementById("id_back_preview").innerHTML = "";
       document.getElementById("id_back_preview").classList.remove("show");
+      uploadedFiles.id_front_image = null;
+      uploadedFiles.id_back_image = null;
 
       // Reset verification state
       isAccountVerified = false;
@@ -512,13 +531,17 @@ function validateForm() {
   }
 
   // Validate ID images
-  const idFrontFile = document.getElementById("id_front_image").files[0];
+  const idFrontFile =
+    uploadedFiles.id_front_image ||
+    document.getElementById("id_front_image").files[0];
   if (!idFrontFile) {
     showError("id_front_image", "Please upload the front image of your ID");
     isValid = false;
   }
 
-  const idBackFile = document.getElementById("id_back_image").files[0];
+  const idBackFile =
+    uploadedFiles.id_back_image ||
+    document.getElementById("id_back_image").files[0];
   if (!idBackFile) {
     showError("id_back_image", "Please upload the back image of your ID");
     isValid = false;
@@ -723,8 +746,12 @@ function collectFormData() {
   }
 
   // Add file uploads
-  const idFrontFile = document.getElementById("id_front_image").files[0];
-  const idBackFile = document.getElementById("id_back_image").files[0];
+  const idFrontFile =
+    uploadedFiles.id_front_image ||
+    document.getElementById("id_front_image").files[0];
+  const idBackFile =
+    uploadedFiles.id_back_image ||
+    document.getElementById("id_back_image").files[0];
 
   if (idFrontFile) {
     data.append("id_front_image", idFrontFile);
@@ -928,6 +955,7 @@ function handleImagePreview(event, previewDivId) {
   const file = event.target.files[0];
   const previewDiv = document.getElementById(previewDivId);
   const inputId = event.target.id;
+  const stateKey = inputId === "id_front_image" ? "id_front_image" : "id_back_image";
 
   // Clear previous preview
   previewDiv.innerHTML = "";
@@ -935,6 +963,7 @@ function handleImagePreview(event, previewDivId) {
   clearError(inputId);
 
   if (!file) {
+    uploadedFiles[stateKey] = null;
     return;
   }
 
@@ -943,6 +972,7 @@ function handleImagePreview(event, previewDivId) {
   if (!validTypes.includes(file.type)) {
     showError(inputId, "Please upload a valid image file (JPG, PNG, or GIF)");
     event.target.value = ""; // Clear the input
+    uploadedFiles[stateKey] = null;
     return;
   }
 
@@ -951,8 +981,11 @@ function handleImagePreview(event, previewDivId) {
   if (file.size > maxSize) {
     showError(inputId, "File size must be less than 5MB");
     event.target.value = ""; // Clear the input
+    uploadedFiles[stateKey] = null;
     return;
   }
+
+  uploadedFiles[stateKey] = file;
 
   // Create image preview
   const reader = new FileReader();

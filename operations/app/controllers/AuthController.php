@@ -324,6 +324,10 @@ class AuthController extends Controller{
         $errors[] = 'ID front image is required';
       }
 
+      if(!isset($_FILES['id_back']) || $_FILES['id_back']['error'] !== 0) {
+        $errors[] = 'ID back image is required';
+      }
+
       if(!isset($_FILES['profile_picture']) || $_FILES['profile_picture']['error'] !== 0) {
         $errors[] = 'Profile picture is required';
       }
@@ -340,73 +344,138 @@ class AuthController extends Controller{
         }
 
         $uploadedFiles = [];
-        
-        // Upload ID Front
-        if(isset($_FILES['id_front']) && $_FILES['id_front']['error'] === 0) {
-          $idFrontName = uniqid('id_front_image_') . '_' . basename($_FILES['id_front']['name']);
-          if(move_uploaded_file($_FILES['id_front']['tmp_name'], $uploadPath . $idFrontName)) {
-            $uploadedFiles['id_front'] = 'uploads/id_images/' . $idFrontName;
-          }
+        $uploadErrors = [];
+
+        $idFrontPath = $this->storeSignupUpload('id_front', $uploadPath, $uploadErrors);
+        if ($idFrontPath) {
+          $uploadedFiles['id_front'] = $idFrontPath;
         }
 
-        // Upload ID Back
-        if(isset($_FILES['id_back']) && $_FILES['id_back']['error'] === 0) {
-          $idBackName = uniqid('id_back_image_') . '_' . basename($_FILES['id_back']['name']);
-          if(move_uploaded_file($_FILES['id_back']['tmp_name'], $uploadPath . $idBackName)) {
-            $uploadedFiles['id_back'] = 'uploads/id_images/' . $idBackName;
-          }
+        $idBackPath = $this->storeSignupUpload('id_back', $uploadPath, $uploadErrors);
+        if ($idBackPath) {
+          $uploadedFiles['id_back'] = $idBackPath;
         }
 
-        // Upload Profile Picture
-        if(isset($_FILES['profile_picture']) && $_FILES['profile_picture']['error'] === 0) {
-          $profileName = uniqid('selfie_image_') . '_' . basename($_FILES['profile_picture']['name']);
-          if(move_uploaded_file($_FILES['profile_picture']['tmp_name'], $uploadPath . $profileName)) {
-            $uploadedFiles['profile_picture'] = 'uploads/id_images/' . $profileName;
-          }
+        $profilePath = $this->storeSignupUpload('profile_picture', $uploadPath, $uploadErrors);
+        if ($profilePath) {
+          $uploadedFiles['profile_picture'] = $profilePath;
         }
 
-        // Upload Signature
-        if(isset($_FILES['signature']) && $_FILES['signature']['error'] === 0) {
-          $signatureName = uniqid('signature_image_') . '_' . basename($_FILES['signature']['name']);
-          if(move_uploaded_file($_FILES['signature']['tmp_name'], $uploadPath . $signatureName)) {
-            $uploadedFiles['signature'] = 'uploads/id_images/' . $signatureName;
-          }
+        $signaturePath = $this->storeSignupUpload('signature', $uploadPath, $uploadErrors);
+        if ($signaturePath) {
+          $uploadedFiles['signature'] = $signaturePath;
+        }
+
+        if (!empty($uploadErrors)) {
+          $errors = array_merge($errors, $uploadErrors);
+          $this->cleanupUploadedFiles($uploadedFiles);
         }
 
         // Stage signup data in session and require OTP verification before DB save
-        $otp = sprintf('%06d', mt_rand(0, 999999));
-        $_SESSION['signup_otp'] = $otp;
-        $_SESSION['otp_signup_time'] = time();
-        $_SESSION['signup_otp_verified'] = false;
-        $pendingSignupData = $data;
-        unset($pendingSignupData['error']);
-        unset($pendingSignupData['genders']);
-        unset($pendingSignupData['provinces']);
-        unset($pendingSignupData['cities']);
-        unset($pendingSignupData['barangays']);
-        $_SESSION['pending_signup_data'] = $pendingSignupData;
-        $_SESSION['pending_uploaded_files'] = $uploadedFiles;
+        if (empty($errors)) {
+          $otp = sprintf('%06d', mt_rand(0, 999999));
+          $_SESSION['signup_otp'] = $otp;
+          $_SESSION['otp_signup_time'] = time();
+          $_SESSION['signup_otp_verified'] = false;
+          $pendingSignupData = $data;
+          unset($pendingSignupData['error']);
+          unset($pendingSignupData['genders']);
+          unset($pendingSignupData['provinces']);
+          unset($pendingSignupData['cities']);
+          unset($pendingSignupData['barangays']);
+          $_SESSION['pending_signup_data'] = $pendingSignupData;
+          $_SESSION['pending_uploaded_files'] = $uploadedFiles;
 
-        $emailSent = $this->sendSignupOtpEmail($data['email'], $data['first_name'], $otp, false);
+          $emailSent = $this->sendSignupOtpEmail($data['email'], $data['first_name'], $otp, false);
 
-        if ($emailSent['success']) {
-          header('Location: ' . URLROOT . '/auth/verify_signup');
-          exit;
+          if ($emailSent['success']) {
+            if ($this->isFetchRequest()) {
+              header('Content-Type: application/json');
+              echo json_encode(['success' => true, 'redirect_url' => URLROOT . '/auth/verify_signup']);
+              exit;
+            }
+            header('Location: ' . URLROOT . '/auth/verify_signup');
+            exit;
+          }
+
+          $this->cleanupUploadedFiles($uploadedFiles);
+          unset($_SESSION['signup_otp']);
+          unset($_SESSION['otp_signup_time']);
+          unset($_SESSION['signup_otp_verified']);
+          unset($_SESSION['pending_signup_data']);
+          unset($_SESSION['pending_uploaded_files']);
+          $errorMsg = $emailSent['error'] ?? 'Failed to send verification code. Please try again.';
+
+          if ($this->isFetchRequest()) {
+              header('Content-Type: application/json');
+              echo json_encode(['success' => false, 'error' => $errorMsg]);
+              exit;
+          }
+          $data['error'] = $errorMsg;
+        } else {
+          $errorMsg = implode('<br>', $errors);
+          if ($this->isFetchRequest()) {
+              header('Content-Type: application/json');
+              echo json_encode(['success' => false, 'error' => $errorMsg]);
+              exit;
+          }
+          $data['error'] = $errorMsg;
         }
-
-        $this->cleanupUploadedFiles($uploadedFiles);
-        unset($_SESSION['signup_otp']);
-        unset($_SESSION['otp_signup_time']);
-        unset($_SESSION['signup_otp_verified']);
-        unset($_SESSION['pending_signup_data']);
-        unset($_SESSION['pending_uploaded_files']);
-        $data['error'] = $emailSent['error'] ?? 'Failed to send verification code. Please try again.';
-      } else {
-        $data['error'] = implode('<br>', $errors);
       }
     }
 
     $this->view('auth/signup', $data);
+  }
+
+  private function isFetchRequest()
+  {
+      return isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
+  }
+
+  private function storeSignupUpload($fileKey, $uploadPath, &$errors)
+  {
+    if (!isset($_FILES[$fileKey]) || $_FILES[$fileKey]['error'] !== UPLOAD_ERR_OK) {
+      $errors[] = ucfirst(str_replace('_', ' ', $fileKey)) . ' upload failed';
+      return null;
+    }
+
+    $file = $_FILES[$fileKey];
+
+    if ($file['size'] > 5 * 1024 * 1024) {
+      $errors[] = ucfirst(str_replace('_', ' ', $fileKey)) . ' must be 5MB or smaller';
+      return null;
+    }
+
+    $finfo = new finfo(FILEINFO_MIME_TYPE);
+    $mimeType = $finfo->file($file['tmp_name']);
+    $allowedTypes = [
+      'image/jpeg' => 'jpg',
+      'image/jpg' => 'jpg',
+      'image/png' => 'png',
+      'image/webp' => 'webp'
+    ];
+
+    if (!isset($allowedTypes[$mimeType])) {
+      $errors[] = ucfirst(str_replace('_', ' ', $fileKey)) . ' must be a JPG, PNG, or WEBP image';
+      return null;
+    }
+
+    // Save with original filename (sanitize dangerous characters only)
+    $originalName = basename($file['name']);
+    $fileName = preg_replace('/[^A-Za-z0-9._\- ]/', '_', $originalName);
+
+    if ($fileName === '' || $fileName === null) {
+      $fileName = $fileKey . '.' . $allowedTypes[$mimeType];
+    }
+
+    if (!move_uploaded_file($file['tmp_name'], $uploadPath . $fileName)) {
+      $errors[] = 'Failed to save ' . str_replace('_', ' ', $fileKey) . ' image';
+      return null;
+    }
+
+    // Return full URL to be stored in database
+    $baseUrl = 'http://localhost/basic-operation';
+    return $baseUrl . '/uploads/id_images/' . $fileName;
   }
 
   public function verify_signup() {
@@ -451,6 +520,12 @@ class AuthController extends Controller{
 
       // Set success message in session
       $_SESSION['signup_success'] = 'Registration successful! Your email has been verified. Your application is pending review. You will receive an email once approved.';
+      
+      if ($this->isFetchRequest()) {
+        header('Content-Type: application/json');
+        echo json_encode(['success' => true, 'redirect_url' => URLROOT . '/auth/login']);
+        exit;
+      }
       header('Location: ' . URLROOT . '/auth/login');
       exit;
     } else {
@@ -464,6 +539,12 @@ class AuthController extends Controller{
       unset($_SESSION['signup_otp_verified']);
 
       $_SESSION['error'] = $result['error'] ?? 'Registration failed. Please try again.';
+      
+      if ($this->isFetchRequest()) {
+        header('Content-Type: application/json');
+        echo json_encode(['success' => false, 'error' => $_SESSION['error']]);
+        exit;
+      }
       header('Location: ' . URLROOT . '/auth/signup');
       exit;
     }

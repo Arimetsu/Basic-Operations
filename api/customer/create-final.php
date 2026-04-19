@@ -397,15 +397,16 @@ try {
         error_log("Created bank_customers record with ID: " . $customerId);
         
         // Step 3: Now handle ID image uploads with proper customer_id
+        $baseUrl = 'http://localhost/basic-operation';
+        
         // Upload front image
         if (isset($_FILES['id_front_image']) && $_FILES['id_front_image']['error'] === UPLOAD_ERR_OK) {
             $frontFile = $_FILES['id_front_image'];
-            $frontExt = pathinfo($frontFile['name'], PATHINFO_EXTENSION);
-            $frontFilename = 'id_front_' . $customerId . '_' . time() . '.' . $frontExt;
+            $frontFilename = preg_replace('/[^A-Za-z0-9._\- ]/', '_', basename($frontFile['name']));
             $frontPath = $uploadDir . $frontFilename;
             
             if (move_uploaded_file($frontFile['tmp_name'], $frontPath)) {
-                $idFrontPath = 'uploads/id_images/' . $frontFilename;
+                $idFrontPath = $baseUrl . '/uploads/id_images/' . $frontFilename;
                 error_log("Front ID image uploaded: " . $idFrontPath);
                 
                 // Store in application_documents table
@@ -429,12 +430,11 @@ try {
         // Upload back image
         if (isset($_FILES['id_back_image']) && $_FILES['id_back_image']['error'] === UPLOAD_ERR_OK) {
             $backFile = $_FILES['id_back_image'];
-            $backExt = pathinfo($backFile['name'], PATHINFO_EXTENSION);
-            $backFilename = 'id_back_' . $customerId . '_' . time() . '.' . $backExt;
+            $backFilename = preg_replace('/[^A-Za-z0-9._\- ]/', '_', basename($backFile['name']));
             $backPath = $uploadDir . $backFilename;
             
             if (move_uploaded_file($backFile['tmp_name'], $backPath)) {
-                $idBackPath = 'uploads/id_images/' . $backFilename;
+                $idBackPath = $baseUrl . '/uploads/id_images/' . $backFilename;
                 error_log("Back ID image uploaded: " . $idBackPath);
                 
                 // Store in application_documents table
@@ -458,12 +458,11 @@ try {
         // Step 3b: Handle E-Signature upload
         if (isset($_FILES['e_signature_image']) && $_FILES['e_signature_image']['error'] === UPLOAD_ERR_OK) {
             $sigFile = $_FILES['e_signature_image'];
-            $sigExt = pathinfo($sigFile['name'], PATHINFO_EXTENSION);
-            $sigFilename = 'e_signature_' . $customerId . '_' . time() . '.' . $sigExt;
+            $sigFilename = preg_replace('/[^A-Za-z0-9._\- ]/', '_', basename($sigFile['name']));
             $sigPath = $uploadDir . $sigFilename;
             
             if (move_uploaded_file($sigFile['tmp_name'], $sigPath)) {
-                $sigRelPath = 'uploads/id_images/' . $sigFilename;
+                $sigRelPath = $baseUrl . '/uploads/id_images/' . $sigFilename;
                 error_log("E-Signature uploaded: " . $sigRelPath);
                 
                 $docStmt = $db->prepare("

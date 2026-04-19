@@ -347,25 +347,32 @@
                 <h4 class="section-title">Choose Your Account Type</h4>
                 <p class="section-subtitle">Select the account type that best fits your needs</p>
                 
-                <?php if (!empty($data['account_types'])): ?>
+                <?php
+                    $displayAccountTypes = array_values(array_filter($data['account_types'] ?? [], function ($type) {
+                        $typeName = strtolower(trim($type->type_name ?? ''));
+                        return $typeName === 'savings' || $typeName === 'savings account' || $typeName === 'checking' || $typeName === 'checking account' || $typeName === 'current' || $typeName === 'current account';
+                    }));
+                ?>
+                <?php if (!empty($displayAccountTypes)): ?>
                 <div class="account-types-grid">
-                    <?php foreach ($data['account_types'] as $type): ?>
+                    <?php foreach ($displayAccountTypes as $type): ?>
+                        <?php
+                            $typeName = strtolower(trim($type->type_name ?? ''));
+                            $displayTypeName = (str_contains($typeName, 'savings')) ? 'Savings Account' : 'Checking Account';
+                            $isSavings = str_contains($typeName, 'savings');
+                        ?>
                         <label class="account-type-card" data-type-id="<?= $type->account_type_id ?>">
                             <input type="radio" name="account_type_id" value="<?= $type->account_type_id ?>" required>
                             <div class="account-type-header">
                                 <div class="account-type-icon">
-                                    <?php if (stripos($type->type_name, 'savings') !== false): ?>
+                                    <?php if ($isSavings): ?>
                                         <i class="bi bi-piggy-bank"></i>
-                                    <?php elseif (stripos($type->type_name, 'current') !== false || stripos($type->type_name, 'checking') !== false): ?>
-                                        <i class="bi bi-credit-card"></i>
-                                    <?php elseif (stripos($type->type_name, 'time') !== false || stripos($type->type_name, 'deposit') !== false): ?>
-                                        <i class="bi bi-clock-history"></i>
                                     <?php else: ?>
-                                        <i class="bi bi-wallet2"></i>
+                                        <i class="bi bi-credit-card"></i>
                                     <?php endif; ?>
                                 </div>
                                 <div>
-                                    <h5 class="account-type-title"><?= htmlspecialchars($type->type_name) ?></h5>
+                                    <h5 class="account-type-title"><?= htmlspecialchars($displayTypeName) ?></h5>
                                 </div>
                             </div>
                             <p class="account-type-description"><?= htmlspecialchars($type->description ?? 'Banking account') ?></p>
@@ -639,7 +646,7 @@ document.querySelectorAll('.account-type-card').forEach(card => {
         this.classList.add('selected');
         this.querySelector('input[type="radio"]').checked = true;
         
-        const typeId = this.dataset.typeId;
+    const typeId = this.dataset.typeId;
         selectedAccountType = accountTypesData.find(t => t.account_type_id == typeId);
         
         // Update service availability
@@ -725,7 +732,9 @@ function validateStep(step) {
 function updateReview() {
     // Account type
     if (selectedAccountType) {
-        document.getElementById('review-account-type').textContent = selectedAccountType.type_name;
+        const typeName = (selectedAccountType.type_name || '').toLowerCase();
+        document.getElementById('review-account-type').textContent =
+            typeName.includes('savings') ? 'Savings Account' : 'Checking Account';
     }
     
     // Services

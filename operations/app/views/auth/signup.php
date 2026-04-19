@@ -193,6 +193,37 @@
         background: #d1f2e6;
         border-style: solid;
     }
+    .upload-box.preview-mode {
+        padding: 18px 16px;
+    }
+    .upload-box.preview-mode p {
+        display: none;
+    }
+    .upload-box-preview {
+        display: block;
+        width: 100%;
+        max-height: 140px;
+        object-fit: cover;
+        border-radius: 8px;
+        margin-bottom: 10px;
+        border: 1px solid rgba(25, 135, 84, 0.25);
+        background: #fff;
+    }
+    .upload-box.preview-mode i,
+    .upload-box.preview-mode small {
+        display: none;
+    }
+    .upload-box-filename {
+        display: block;
+        margin-top: 6px;
+        font-size: 12px;
+        font-weight: 600;
+        color: #198754;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
     .camera-upload-btn {
         margin-top: 10px;
         width: 100%;
@@ -586,7 +617,9 @@
                         <label class="form-label">Upload ID (Front) *</label>
                         <div class="upload-box" id="id_front_box" onclick="document.getElementById('id_front').click()">
                             <i class="bi bi-cloud-upload" style="font-size: 2rem; color: #198754;"></i>
+                            <img class="upload-box-preview" alt="ID Front preview" style="display:none;" />
                             <p class="mb-0 mt-2">Click to upload</p>
+                            <span class="upload-box-filename"></span>
                             <small class="text-muted">Max 5MB</small>
                         </div>
                         <button type="button" class="btn btn-outline-success btn-sm camera-upload-btn" onclick="openCameraFor('id_front')">
@@ -595,10 +628,12 @@
                         <input type="file" name="id_front" id="id_front" class="d-none" accept="image/*" required>
                     </div>
                     <div class="col-md-6 mb-3">
-                        <label class="form-label">Upload ID (Back)</label>
+                        <label class="form-label">Upload ID (Back) *</label>
                         <div class="upload-box" id="id_back_box" onclick="document.getElementById('id_back').click()">
                             <i class="bi bi-cloud-upload" style="font-size: 2rem; color: #198754;"></i>
+                            <img class="upload-box-preview" alt="ID Back preview" style="display:none;" />
                             <p class="mb-0 mt-2">Click to upload</p>
+                            <span class="upload-box-filename"></span>
                             <small class="text-muted">Max 5MB</small>
                         </div>
                         <button type="button" class="btn btn-outline-success btn-sm camera-upload-btn" onclick="openCameraFor('id_back')">
@@ -621,7 +656,9 @@
                         <label class="form-label">Profile Picture *</label>
                         <div class="upload-box" id="profile_pic_box" onclick="document.getElementById('profile_picture').click()">
                             <i class="bi bi-person-circle" style="font-size: 2rem; color: #198754;"></i>
+                            <img class="upload-box-preview" alt="Profile picture preview" style="display:none;" />
                             <p class="mb-0 mt-2">Upload Photo</p>
+                            <span class="upload-box-filename"></span>
                             <small class="text-muted">Max 5MB</small>
                         </div>
                         <button type="button" class="btn btn-outline-success btn-sm camera-upload-btn" onclick="openCameraFor('profile_picture')">
@@ -633,7 +670,9 @@
                         <label class="form-label">Digital Signature *</label>
                         <div class="upload-box" id="signature_box" onclick="document.getElementById('signature').click()">
                             <i class="bi bi-pen" style="font-size: 2rem; color: #198754;"></i>
+                            <img class="upload-box-preview" alt="Signature preview" style="display:none;" />
                             <p class="mb-0 mt-2">Upload Signature</p>
+                            <span class="upload-box-filename"></span>
                             <small class="text-muted">Max 5MB</small>
                         </div>
                         <button type="button" class="btn btn-outline-success btn-sm camera-upload-btn" onclick="openCameraFor('signature')">
@@ -885,6 +924,7 @@ let signupCameraStream = null;
 let activeCameraTargetInputId = null;
 let cameraCaptureDataUrl = '';
 
+// State for uploaded files
 // Load cities and barangays data
 const citiesData = <?= json_encode($data['cities'] ?? []) ?>;
 const barangaysData = <?= json_encode($data['barangays'] ?? []) ?>;
@@ -1019,15 +1059,103 @@ document.getElementById('city_id').addEventListener('change', function() {
 });
 
 // File upload handlers
+const signupUploadDefaults = {
+    id_front: 'Click to upload',
+    id_back: 'Click to upload',
+    profile_picture: 'Upload Photo',
+    signature: 'Upload Signature',
+};
+
+function getUploadBoxId(inputId) {
+    return inputId === 'profile_picture' ? 'profile_pic_box' : inputId + '_box';
+}
+
+function resetUploadBox(box, inputId) {
+    box.classList.remove('has-file', 'preview-mode');
+    const preview = box.querySelector('.upload-box-preview');
+    if (preview) {
+        preview.src = '';
+        preview.style.display = 'none';
+    }
+
+    const label = box.querySelector('p');
+    if (label) {
+        label.textContent = signupUploadDefaults[inputId] || 'Click to upload';
+    }
+
+    const fileNameEl = box.querySelector('.upload-box-filename');
+    if (fileNameEl) {
+        fileNameEl.textContent = '';
+    }
+
+    const helperText = box.querySelector('small');
+    if (helperText) {
+        helperText.style.display = 'block';
+    }
+
+    const input = document.getElementById(inputId);
+    if (input) {
+        input.value = '';
+    }
+}
+
+function validateSignupFile(file) {
+    const maxSize = 5 * 1024 * 1024;
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+
+    if (!allowedTypes.includes(file.type)) {
+        return {
+            valid: false,
+            message: 'Invalid file type. Please upload JPG, PNG, or WEBP images only.'
+        };
+    }
+
+    if (file.size > maxSize) {
+        return {
+            valid: false,
+            message: 'File size exceeds 5MB. Please upload a smaller image.'
+        };
+    }
+
+    return { valid: true };
+}
+
 ['id_front', 'id_back', 'profile_picture', 'signature'].forEach(id => {
-    document.getElementById(id).addEventListener('change', function(e) {
-        const boxId = id === 'profile_picture' ? 'profile_pic_box' : id + '_box';
-        const box = document.getElementById(boxId);
-        if (this.files.length > 0) {
-            box.classList.add('has-file');
-            const fileName = this.files[0].name;
-            box.querySelector('p').textContent = fileName;
+    const input = document.getElementById(id);
+    if (!input) return;
+
+    input.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        const box = document.getElementById(getUploadBoxId(id));
+
+        if (!file) {
+            resetUploadBox(box, id);
+            return;
         }
+
+        const validation = validateSignupFile(file);
+        if (!validation.valid) {
+            alert(validation.message);
+            resetUploadBox(box, id);
+            return;
+        }
+
+        box.classList.add('has-file');
+        const fileNameEl = box.querySelector('.upload-box-filename');
+        if (fileNameEl) {
+            fileNameEl.textContent = file.name;
+        }
+
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            const preview = box.querySelector('.upload-box-preview');
+            if (preview) {
+                preview.src = event.target.result;
+                preview.style.display = 'block';
+                box.classList.add('preview-mode');
+            }
+        };
+        reader.readAsDataURL(file);
     });
 });
 
@@ -1291,12 +1419,12 @@ function useCapturedSignupPhoto() {
         return;
     }
 
-    const targetPrefix = activeCameraTargetInputId === 'profile_picture' ? 'profile' : activeCameraTargetInputId;
+    const captureFileName = `${activeCameraTargetInputId}.jpg`;
 
     fetch(cameraCaptureDataUrl)
         .then(response => response.blob())
         .then(blob => {
-            const file = new File([blob], `${targetPrefix}_capture_${Date.now()}.jpg`, { type: 'image/jpeg' });
+            const file = new File([blob], captureFileName, { type: 'image/jpeg' });
             const transfer = new DataTransfer();
             transfer.items.add(file);
             input.files = transfer.files;
@@ -1341,46 +1469,46 @@ document.getElementById('cameraModal').addEventListener('hidden.bs.modal', funct
 document.getElementById('signupForm').addEventListener('submit', function(e) {
     if (!validateDateRules()) {
         e.preventDefault();
-        return false;
+        return;
     }
 
     const password = document.getElementById('password').value;
     const confirmPassword = document.getElementById('confirm_password').value;
     
     if (password !== confirmPassword) {
+        alert('Passwords do not match.');
         e.preventDefault();
-        alert('Passwords do not match!');
-        return false;
+        return;
     }
     
     if (password.length < 10) {
+        alert('Password must be at least 10 characters.');
         e.preventDefault();
-        alert('Password must be at least 10 characters long!');
-        return false;
+        return;
     }
     
     if (!/[A-Z]/.test(password)) {
+        alert('Password must contain at least one uppercase letter.');
         e.preventDefault();
-        alert('Password must contain at least one uppercase letter!');
-        return false;
+        return;
     }
     
     if (!/[a-z]/.test(password)) {
+        alert('Password must contain at least one lowercase letter.');
         e.preventDefault();
-        alert('Password must contain at least one lowercase letter!');
-        return false;
+        return;
     }
     
     if (!/\d/.test(password)) {
+        alert('Password must contain at least one number.');
         e.preventDefault();
-        alert('Password must contain at least one number!');
-        return false;
+        return;
     }
     
     if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
+        alert('Password must contain at least one special character.');
         e.preventDefault();
-        alert('Password must contain at least one special character (!@#$%^&* etc.)!');
-        return false;
+        return;
     }
 });
 </script>

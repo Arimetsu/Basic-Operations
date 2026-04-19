@@ -102,30 +102,53 @@ if (isset($_SESSION['otp_signup_time'])) {
 ?>
 
 <style>
+    .navbar,
+    .footer {
+        display: none !important;
+    }
+
+    html,
     body {
-        background: #f8f9fa;
-        min-height: 100vh;
+        height: 100%;
+        margin: 0;
+    }
+
+    body {
+        background: radial-gradient(circle at top, #f3f8f7 0%, #eef3f2 45%, #e8edec 100%);
+        min-height: 100%;
         display: flex;
         align-items: center;
         justify-content: center;
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        padding: 20px;
+        padding: 24px;
     }
     
     .verify-container {
         background: white;
-        border-radius: 12px;
-        box-shadow: 0 2px 20px rgba(0, 0, 0, 0.08);
-        max-width: 450px;
+        border-radius: 16px;
+        box-shadow: 0 20px 50px rgba(0, 40, 35, 0.12);
+        max-width: 480px;
         width: 100%;
-        border: 1px solid #e9ecef;
+        border: 1px solid #dfe7e5;
         overflow: hidden;
+        animation: cardIn 0.35s ease-out;
+    }
+
+    @keyframes cardIn {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
     }
     
     .verify-header {
         background: white;
-        border-bottom: 2px solid #003631;
-        padding: 30px 30px 20px;
+        border-bottom: 2px solid #0b4f47;
+        padding: 28px 28px 18px;
         text-align: center;
     }
     
@@ -142,7 +165,7 @@ if (isset($_SESSION['otp_signup_time'])) {
     
     .verify-header h1 {
         color: #003631;
-        font-size: 24px;
+        font-size: 30px;
         font-weight: 700;
         margin: 0 0 8px;
     }
@@ -154,7 +177,7 @@ if (isset($_SESSION['otp_signup_time'])) {
     }
     
     .verify-body {
-        padding: 25px 30px 30px;
+        padding: 22px 28px 26px;
     }
     
     .info-box {
@@ -179,8 +202,8 @@ if (isset($_SESSION['otp_signup_time'])) {
     }
     
     .otp-input {
-        width: 50px;
-        height: 60px;
+        width: 52px;
+        height: 62px;
         text-align: center;
         font-size: 24px;
         font-weight: 700;
@@ -284,6 +307,32 @@ if (isset($_SESSION['otp_signup_time'])) {
         align-items: center;
         gap: 10px;
         font-size: 14px;
+    }
+
+    @media (max-width: 576px) {
+        body {
+            padding: 14px;
+        }
+
+        .verify-header h1 {
+            font-size: 26px;
+        }
+
+        .verify-body,
+        .verify-header {
+            padding-left: 18px;
+            padding-right: 18px;
+        }
+
+        .otp-input-group {
+            gap: 8px;
+        }
+
+        .otp-input {
+            width: 44px;
+            height: 54px;
+            font-size: 20px;
+        }
     }
 </style>
 

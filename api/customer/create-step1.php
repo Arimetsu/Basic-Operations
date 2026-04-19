@@ -35,6 +35,16 @@ try {
     
     // Sanitize input data
     $data = sanitizeInput($input);
+
+    // Normalize account type aliases sent by UI/options to canonical values.
+    $rawAccountType = isset($data['account_type']) ? trim((string)$data['account_type']) : '';
+    $accountTypeLower = strtolower($rawAccountType);
+    $normalizedAccountType = $rawAccountType;
+    if ($accountTypeLower === 'current' || $accountTypeLower === 'current account' || $accountTypeLower === 'checking' || $accountTypeLower === 'checking account') {
+        $normalizedAccountType = 'Checking';
+    } elseif ($accountTypeLower === 'savings' || $accountTypeLower === 'savings account') {
+        $normalizedAccountType = 'Savings';
+    }
     
     // Prepare data structure for validation
     $validationData = [
@@ -53,7 +63,7 @@ try {
         'emails' => $data['emails'] ?? [],
         'phones' => $data['phones'] ?? [],
         'postal_code' => $data['postal_code'] ?? '',
-        'account_type' => $data['account_type'] ?? 'Savings', // Default to Savings if not provided
+        'account_type' => $normalizedAccountType !== '' ? $normalizedAccountType : 'Savings', // Default to Savings if not provided
         'source_of_funds' => $data['source_of_funds'] ?? '',
         'employment_status' => $data['employment_status'] ?? '',
         'employer_name' => $data['employer_name'] ?? '',

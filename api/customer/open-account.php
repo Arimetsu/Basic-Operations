@@ -202,26 +202,27 @@ try {
 
     $idFrontPath = null;
     $idBackPath = null;
+    $baseUrl = 'http://localhost/basic-operation';
 
     // Upload front image
     if (isset($_FILES['id_front_image']) && $_FILES['id_front_image']['error'] === UPLOAD_ERR_OK) {
-        $ext = pathinfo($_FILES['id_front_image']['name'], PATHINFO_EXTENSION);
-        $fileName = 'id_front_' . $customerId . '_' . time() . '.' . $ext;
-        $targetPath = $uploadDir . $fileName;
+        $frontOriginalName = basename($_FILES['id_front_image']['name']);
+        $frontSafeName = preg_replace('/[^A-Za-z0-9._\- ]/', '_', $frontOriginalName);
+        $targetPath = $uploadDir . $frontSafeName;
         
         if (move_uploaded_file($_FILES['id_front_image']['tmp_name'], $targetPath)) {
-            $idFrontPath = 'uploads/id_images/' . $fileName;
+            $idFrontPath = $baseUrl . '/uploads/id_images/' . $frontSafeName;
         }
     }
 
     // Upload back image
     if (isset($_FILES['id_back_image']) && $_FILES['id_back_image']['error'] === UPLOAD_ERR_OK) {
-        $ext = pathinfo($_FILES['id_back_image']['name'], PATHINFO_EXTENSION);
-        $fileName = 'id_back_' . $customerId . '_' . time() . '.' . $ext;
-        $targetPath = $uploadDir . $fileName;
+        $backOriginalName = basename($_FILES['id_back_image']['name']);
+        $backSafeName = preg_replace('/[^A-Za-z0-9._\- ]/', '_', $backOriginalName);
+        $targetPath = $uploadDir . $backSafeName;
         
         if (move_uploaded_file($_FILES['id_back_image']['tmp_name'], $targetPath)) {
-            $idBackPath = 'uploads/id_images/' . $fileName;
+            $idBackPath = $baseUrl . '/uploads/id_images/' . $backSafeName;
         }
     }
 

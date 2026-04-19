@@ -318,23 +318,21 @@ try {
     $applicationId = $db->lastInsertId();
     error_log("Created account_applications record with ID: " . $applicationId);
 
-    $saveCustomerDocument = function (string $fileKey, ?int $docTypeId, string $docTypeName, string $defaultName) use ($db, $customerId, $applicationId, $uploadDir, $hasCustomerDocumentsTable, $hasApplicationDocumentsTable) {
+    $saveCustomerDocument = function (string $fileKey, ?int $docTypeId, string $docTypeName, string $defaultName) use ($db, $customerId, $applicationId, $uploadDir, $hasCustomerDocumentsTable, $hasApplicationDocumentsTable, $tableHasColumn) {
         if (!isset($_FILES[$fileKey]) || $_FILES[$fileKey]['error'] !== UPLOAD_ERR_OK) {
             return;
         }
 
         $file = $_FILES[$fileKey];
-        $originalName = $file['name'] ?: $defaultName;
-        $ext = pathinfo($originalName, PATHINFO_EXTENSION);
-        $safeExt = $ext ? ('.' . strtolower($ext)) : '';
-        $storedName = $fileKey . '_' . $customerId . '_' . time() . $safeExt;
-        $storedPath = $uploadDir . $storedName;
+        $originalName = preg_replace('/[^A-Za-z0-9._\- ]/', '_', $file['name'] ?: $defaultName);
+        $storedPath = $uploadDir . $originalName;
 
         if (!move_uploaded_file($file['tmp_name'], $storedPath)) {
             throw new Exception("Failed to save uploaded file: {$fileKey}");
         }
 
-        $relativePath = 'uploads/id_images/' . $storedName;
+        $baseUrl = 'http://localhost/basic-operation';
+        $fullUrl = $baseUrl . '/uploads/id_images/' . $originalName;
 
         if ($hasCustomerDocumentsTable) {
             $docStmt = $db->prepare(
@@ -347,7 +345,7 @@ try {
             } else {
                 $docStmt->bindValue(':doc_type_id', $docTypeId, PDO::PARAM_INT);
             }
-            $docStmt->bindParam(':file_path', $relativePath);
+            $docStmt->bindParam(':file_path', $fullUrl);
             $docStmt->execute();
             return;
         }
@@ -363,8 +361,8 @@ try {
             );
             $docStmt->bindParam(':application_id', $applicationId);
             $docStmt->bindParam(':document_type', $docTypeName);
-            $docStmt->bindParam(':file_name', $originalName);
-            $docStmt->bindParam(':file_path', $relativePath);
+            $docStmt->bindParam(':file_name', $file['name']);
+            $docStmt->bindParam(':file_path', $fullUrl);
             $docStmt->bindParam(':file_size', $fileSize);
             $docStmt->bindParam(':mime_type', $mimeType);
             $docStmt->execute();
